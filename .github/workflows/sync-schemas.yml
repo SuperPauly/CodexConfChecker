@@ -1,0 +1,55 @@
+name: Sync Codex schemas
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-codex-schemas
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+          cache: npm
+          package-manager-cache: false
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Test release selection and synchronization
+        run: npm run test:scripts
+
+      - name: Check upstream stable and alpha schemas
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/sync-schemas.mjs
+
+      - name: Commit schema updates
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet --exit-code -- public/schemas; then
+            echo "Stable and alpha schemas are already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/schemas
+          git commit -m "chore: sync Codex release schemas"
+          git push
