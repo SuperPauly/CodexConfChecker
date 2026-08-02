@@ -98,7 +98,7 @@ Schema synchronization commits therefore trigger the Pages workflow automaticall
 
 Desktop uses a wide editor with the diagnostics panel alongside or directly beneath it depending on viewport width. Mobile uses a single column with large controls, horizontally scrollable schema choices when necessary, and an editor height suitable for Android browsers.
 
-The visual style is a focused developer tool: near black editor, neutral page surface, restrained green success color, red error lines, and strong accessible contrast. Motion is limited to status transitions and respects reduced motion preferences.
+The visual style is a focused developer tool with complete light and dark themes, restrained green success color, red error lines, and strong accessible contrast. A visible theme control supports System, Light, and Dark. System follows `prefers-color-scheme`; an explicit choice is stored in `localStorage` and restored without a theme flash. Motion is limited to status transitions and respects reduced motion preferences.
 
 ## Testing
 
@@ -112,6 +112,7 @@ Unit and component tests cover:
 - File upload and rejection of unsuitable files
 - Safe formatting success and syntax error failure
 - Copy, clear, and download controls
+- System, Light, and Dark theme selection and persistence
 - Manifest parsing and schema loading failures
 
 Workflow tests exercise release filtering, alpha hotfix ordering, unchanged schemas, metadata only updates, malformed upstream responses, and schema changes. Continuous integration runs formatting checks, linting, type checking, tests, and the production build.
@@ -125,4 +126,5 @@ Workflow tests exercise release filtering, alpha hotfix ordering, unchanged sche
 5. Stable and alpha radio options show their exact Codex versions.
 6. The scheduled workflow checks both channels every 30 minutes and commits only meaningful schema or metadata changes.
 7. Every push to `main`, including schema synchronization commits, triggers a tested GitHub Pages deployment.
-8. The production site requires no backend and sends no TOML content away from the browser.
+8. The responsive interface supports System, Light, and Dark themes with persistent explicit selection.
+9. The production site requires no backend and sends no TOML content away from the browser.
