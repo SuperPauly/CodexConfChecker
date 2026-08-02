@@ -81,7 +81,9 @@ describe("ValidatorWorkbench", () => {
     await waitFor(() => {
       expect(engine.validate).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining("/schemas/alpha/config.schema.json"),
+        expect.stringContaining(
+          `/schemas/alpha/config.schema.json?sha=${"b".repeat(64)}`,
+        ),
       );
     });
   });

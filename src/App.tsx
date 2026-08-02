@@ -37,8 +37,10 @@ type WorkbenchStatus =
   | { readonly type: "invalid"; readonly message: string }
   | { readonly type: "error"; readonly message: string };
 
-function absoluteSchemaUrl(channel: SchemaChannel): string {
-  return new URL(schemaAssetUrl(channel), window.location.href).href;
+function absoluteSchemaUrl(channel: SchemaChannel, sha256: string): string {
+  const url = new URL(schemaAssetUrl(channel), window.location.href);
+  url.searchParams.set("sha", sha256);
+  return url.href;
 }
 
 function lineAndColumn(text: string, offset: number): { line: number; column: number } {
@@ -89,7 +91,10 @@ export function ValidatorWorkbench({ engine, manifest }: ValidatorWorkbenchProps
       const sequence = ++validationSequence.current;
       setStatus({ type: "working", message: "Validating with Taplo..." });
       try {
-        const result = await engine.validate(nextToml, absoluteSchemaUrl(nextChannel));
+        const result = await engine.validate(
+          nextToml,
+          absoluteSchemaUrl(nextChannel, manifest.channels[nextChannel].sha256),
+        );
         if (sequence !== validationSequence.current) return;
         setDiagnostics(result.diagnostics);
         if (result.diagnostics.length === 0) {
@@ -358,7 +363,7 @@ export default function App() {
     let active = true;
     Promise.all([
       import("./taplo/service").then(({ TaploService }) => TaploService.initialize()),
-      fetch(`${import.meta.env.BASE_URL}schemas/manifest.json`).then(async (response) => {
+      fetch(`${import.meta.env.BASE_URL}schemas/manifest.json`, { cache: "no-cache" }).then(async (response) => {
         if (!response.ok) throw new Error(`Schema manifest returned ${response.status}.`);
         return parseSchemaManifest(await response.json());
       }),
