@@ -38,5 +38,5 @@ export function normalizeVersion(tag) {
   if (typeof tag !== "string" || !tag.startsWith("rust-v")) {
     throw new TypeError("Codex release tag must start with rust-v");
   }
-  return tag.slice("rust-v".length);
+  return tag.slice("rust-".length);
 }

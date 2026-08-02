@@ -76,5 +76,5 @@ test("requires both channels", () => {
 });
 
 test("normalizes a release tag for display", () => {
-  assert.equal(normalizeVersion("rust-v0.147.0-alpha.4"), "0.147.0-alpha.4");
+  assert.equal(normalizeVersion("rust-v0.147.0-alpha.4"), "v0.147.0-alpha.4");
 });

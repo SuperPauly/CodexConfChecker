@@ -45,7 +45,7 @@ test("writes exact tag schemas and manifest", async () => {
   const manifest = JSON.parse(
     await readFile(path.join(root, "manifest.json"), "utf8"),
   );
-  assert.equal(manifest.channels.alpha.version, "0.147.0-alpha.4");
+  assert.equal(manifest.channels.alpha.version, "v0.147.0-alpha.4");
   assert.equal(manifest.channels.stable.sha256, sha256(`${stableSchema}\n`));
 });
 

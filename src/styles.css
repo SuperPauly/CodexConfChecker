@@ -261,7 +261,8 @@ h1 {
 .toml-editor .cm-scroller { line-height: 1.75; }
 
 .toml-editor .cm-content {
-  min-width: 100%;
+  width: 100%;
+  min-width: 0;
   padding: 12px 0 30px;
   caret-color: #ffffff;
 }
