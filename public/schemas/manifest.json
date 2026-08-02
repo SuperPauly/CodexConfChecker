@@ -1,16 +1,16 @@
 {
-  "generatedAt": "2026-08-02T22:15:00Z",
+  "generatedAt": "2026-08-02T23:20:30.691Z",
   "channels": {
     "stable": {
       "version": "v0.146.0",
       "tag": "rust-v0.146.0",
-      "sha256": "b5641699de12ecd7cdd61b90308cb28989f6e7ac1b5b6add1950d2e31e626df3",
+      "sha256": "bc44671e90201b030aaead2f8f10a6542a9c26c1544e6004ddfdb8bf9d60fb11",
       "sourceUrl": "https://github.com/openai/codex/blob/rust-v0.146.0/codex-rs/core/config.schema.json"
     },
     "alpha": {
       "version": "v0.147.0-alpha.4",
       "tag": "rust-v0.147.0-alpha.4",
-      "sha256": "333c08c1de28b130a187c432c0de8fb4fa055002885129bd229283faeda4aa4e",
+      "sha256": "f1d589001acfa498b56975573a94b5afec46e213ee691f1519d8fc32613d010a",
       "sourceUrl": "https://github.com/openai/codex/blob/rust-v0.147.0-alpha.4/codex-rs/core/config.schema.json"
     }
   }
