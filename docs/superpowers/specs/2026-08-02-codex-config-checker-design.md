@@ -76,6 +76,14 @@ For each channel, the workflow fetches `codex-rs/core/config.schema.json` from t
 
 When changes exist, the workflow commits them using the GitHub Actions bot and pushes to the default branch. It uses minimal `contents: write` permission, validates downloaded JSON before replacing repository files, and fails without modifying files if either upstream request is invalid.
 
+## GitHub Pages deployment
+
+A separate GitHub Pages workflow runs for every push to `main` and supports manual dispatch. It installs locked dependencies, runs linting, type checking, tests, and the production build before uploading only the generated `dist` directory as the Pages artifact.
+
+Deployment uses GitHub's official Pages actions with `pages: write` and `id-token: write` permissions and a concurrency group that prevents overlapping deployments. Vite uses the `/CodexConfChecker/` base path in production so JavaScript, WebAssembly, and schema assets resolve correctly on the repository Pages URL.
+
+Schema synchronization commits therefore trigger the Pages workflow automatically. A newly imported stable or alpha schema becomes available on the public website after the build and deployment checks pass.
+
 ## Privacy and security
 
 - TOML contents never leave the browser.
@@ -83,6 +91,7 @@ When changes exist, the workflow commits them using the GitHub Actions bot and p
 - Schemas are served from the same site and protected by repository history.
 - The synchronization workflow pins third party actions to full commit SHAs.
 - Workflow shell scripts use strict mode, validate tag formats, validate HTTP responses, and parse JSON with `jq`.
+- GitHub Pages deploys only a tested static build and receives no TOML contents.
 - Uploaded files are treated as text and never executed.
 
 ## Responsive design
@@ -115,4 +124,5 @@ Workflow tests exercise release filtering, alpha hotfix ordering, unchanged sche
 4. Format uses Taplo and does not force format syntactically invalid TOML.
 5. Stable and alpha radio options show their exact Codex versions.
 6. The scheduled workflow checks both channels every 30 minutes and commits only meaningful schema or metadata changes.
-7. The production site requires no backend and sends no TOML content away from the browser.
+7. Every push to `main`, including schema synchronization commits, triggers a tested GitHub Pages deployment.
+8. The production site requires no backend and sends no TOML content away from the browser.
