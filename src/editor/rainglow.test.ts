@@ -4,6 +4,7 @@ import {
   DEFAULT_EDITOR_THEME,
   EDITOR_THEME_KEY,
   RAINGLOW_THEMES,
+  applyRainglowTheme,
   loadEditorTheme,
   saveEditorTheme,
 } from "./rainglow";
@@ -33,5 +34,29 @@ describe("Rainglow editor themes", () => {
       expect(theme.colours.foreground).toMatch(/^#[0-9a-f]{6}$/i);
       expect(theme.colours.foreground).not.toBe(theme.colours.background);
     }
+  });
+
+  it("applies Azure colours to the complete application token set", () => {
+    const root = document.documentElement;
+    const theme = applyRainglowTheme("azure", root);
+
+    expect(theme.id).toBe("azure");
+    expect(root.dataset.rainglowTheme).toBe("azure");
+    expect(root.style.colorScheme).toBe("dark");
+    expect(root.style.getPropertyValue("--page")).toBe("#181d26");
+    expect(root.style.getPropertyValue("--text")).toBe("#ffffff");
+    expect(root.style.getPropertyValue("--focus")).toBe("#52708b");
+    expect(root.style.getPropertyValue("--surface")).toContain("#181d26");
+  });
+
+  it("applies a light Rainglow preset to the complete application", () => {
+    const root = document.documentElement;
+    applyRainglowTheme("github-light", root);
+
+    expect(root.dataset.rainglowTheme).toBe("github-light");
+    expect(root.style.colorScheme).toBe("light");
+    expect(root.style.getPropertyValue("--page")).toBe("#ffffff");
+    expect(root.style.getPropertyValue("--text")).toBe("#555555");
+    expect(root.style.getPropertyValue("--focus")).toBe("#008080");
   });
 });

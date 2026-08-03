@@ -20,6 +20,10 @@
   --danger: #c52727;
   --danger-bg: #fff0f0;
   --danger-line: rgba(215, 38, 38, 0.22);
+  --warning: #9a6200;
+  --warning-bg: #fff7df;
+  --info: #226fba;
+  --info-bg: #edf6ff;
   --editor: #151917;
   --editor-border: #2b312d;
   --editor-text: #edf3ee;
@@ -47,6 +51,10 @@
   --danger: #ff8585;
   --danger-bg: #3b2020;
   --danger-line: rgba(255, 76, 76, 0.28);
+  --warning: #f0bd55;
+  --warning-bg: #3a301c;
+  --info: #7dbbfa;
+  --info-bg: #1d3042;
   --editor: #0b0e0c;
   --editor-border: #343b36;
   --editor-text: #edf3ee;
@@ -340,7 +348,7 @@ h1 {
   width: 100%;
   min-width: 0;
   padding: 12px 0 30px;
-  caret-color: #ffffff;
+  caret-color: var(--editor-text);
 }
 
 .toml-editor .cm-line, .config-editor .cm-line { padding: 0 16px 0 10px; }
@@ -355,10 +363,10 @@ h1 {
 .toml-editor .cm-activeLine,
 .toml-editor .cm-activeLineGutter,
 .config-editor .cm-activeLine,
-.config-editor .cm-activeLineGutter { background: rgba(255, 255, 255, 0.045); }
+.config-editor .cm-activeLineGutter { background: var(--quiet); }
 
 .toml-editor .cm-selectionBackground,
-.toml-editor .cm-content ::selection { background: rgba(91, 167, 255, 0.34) !important; }
+.toml-editor .cm-content ::selection { background: color-mix(in srgb, var(--focus) 45%, transparent) !important; }
 
 .toml-editor .cm-invalid-line,
 .config-editor .cm-error-line {
@@ -367,13 +375,13 @@ h1 {
 }
 
 .config-editor .cm-warning-line {
-  background: rgba(217, 148, 22, 0.22) !important;
-  box-shadow: inset 3px 0 0 #d99416;
+  background: var(--warning-bg) !important;
+  box-shadow: inset 3px 0 0 var(--warning);
 }
 
 .config-editor .cm-info-line {
-  background: rgba(50, 135, 220, 0.18) !important;
-  box-shadow: inset 3px 0 0 #3287dc;
+  background: var(--info-bg) !important;
+  box-shadow: inset 3px 0 0 var(--info);
 }
 
 .cm-error-gutter-marker,
@@ -382,16 +390,11 @@ h1 {
   height: 7px;
   margin: 9px 5px 0;
   border-radius: 50%;
-  background: #ff4d4d;
+  background: var(--danger);
 }
 
-.cm-warning-gutter-marker { background: #d99416; }
-.cm-info-gutter-marker { background: #3287dc; }
-
-.toml-editor .tok-comment { color: #7f9385; }
-.toml-editor .tok-string { color: #a9dbb7; }
-.toml-editor .tok-number, .toml-editor .tok-bool { color: #e3bf76; }
-.toml-editor .tok-propertyName, .toml-editor .tok-typeName { color: #84b9ec; }
+.cm-warning-gutter-marker { background: var(--warning); }
+.cm-info-gutter-marker { background: var(--info); }
 
 .validation-status {
   display: flex;
@@ -450,6 +453,32 @@ h1 {
 
 .problems ol { margin: 0; padding: 0; list-style: none; }
 .problems li + li { border-top: 1px solid var(--border); }
+.problem-groups { display: grid; }
+.problem-group + .problem-group { border-top: 1px solid var(--border); }
+
+.problem-group-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 13px;
+  border: 0;
+  border-left: 3px solid transparent;
+  color: var(--text);
+  background: var(--surface-raised);
+  cursor: pointer;
+  text-align: left;
+}
+
+.group-error .problem-group-toggle { border-left-color: var(--danger); }
+.group-warning .problem-group-toggle { border-left-color: var(--warning); }
+.group-info .problem-group-toggle { border-left-color: var(--info); }
+.problem-group-toggle span { font-size: .78rem; font-weight: 800; }
+.problem-group-toggle strong { min-width: 25px; padding: 2px 7px; border-radius: 999px; background: var(--quiet); font-size: .68rem; text-align: center; }
+.problem-group-toggle svg { transition: transform .16s ease; }
+.problem-group-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
 
 .problems > ol > li > button {
   display: flex;
@@ -522,22 +551,25 @@ h1 {
 .rich-problems .problems-heading label { display: flex; align-items: center; gap: 6px; margin-left: auto; color: var(--muted); font-size: .7rem; }
 .rich-problems .problems-heading label + label { margin-left: 0; }
 .rich-problems .problems-heading select { min-height: 30px; padding: 0 7px; font-size: .72rem; }
+.problem-tools { display: flex; flex-wrap: wrap; gap: 5px; margin-left: auto; }
+.problem-tools button { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 8px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); background: var(--surface); cursor: pointer; font-size: .68rem; font-weight: 700; }
 .problem-item { padding: 13px 14px; border-left: 3px solid transparent; }
 .problem-item.problem-error { border-left-color: var(--danger); }
-.problem-item.problem-warning { border-left-color: #d99416; }
-.problem-item.problem-info { border-left-color: #3287dc; }
+.problem-item.problem-warning { border-left-color: var(--warning); }
+.problem-item.problem-info { border-left-color: var(--info); }
 .problem-summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 10px; }
 .problem-summary > svg { margin-top: 2px; color: var(--danger); }
-.problem-warning .problem-summary > svg { color: #b87700; }
-.problem-info .problem-summary > svg { color: #3287dc; }
+.problem-warning .problem-summary > svg { color: var(--warning); }
+.problem-info .problem-summary > svg { color: var(--info); }
 .problem-summary strong { display: block; font-size: .84rem; line-height: 1.45; }
 .problem-summary small { display: block; margin-top: 3px; color: var(--muted); font-family: "SFMono-Regular", Consolas, monospace; font-size: .66rem; }
 .problem-summary button { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 8px; border: 1px solid var(--border); border-radius: 7px; color: var(--text); background: var(--surface-raised); cursor: pointer; font-family: "SFMono-Regular", Consolas, monospace; font-size: .7rem; }
+.schema-level-label { align-self: center; padding: 4px 7px; border-radius: 6px; color: var(--muted); background: var(--quiet); font-size: .68rem; font-weight: 700; }
 .problem-detail { margin: 8px 0 0 28px; color: var(--muted); font-size: .77rem; line-height: 1.5; }
 .problem-detail p { margin: 4px 0; }
 .problem-detail b { color: var(--text); }
 .problem-metadata { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.problem-metadata code { padding: 3px 6px; border-radius: 5px; color: var(--text); background: var(--quiet); font-size: .67rem; overflow-wrap: anywhere; }
+.problem-metadata code { max-width: 100%; padding: 3px 6px; border-radius: 5px; color: var(--text); background: var(--quiet); font-size: .67rem; overflow-wrap: anywhere; white-space: pre-wrap; }
 
 .drawer-backdrop { position: fixed; z-index: 100; inset: 0; display: flex; justify-content: flex-end; background: rgba(0, 0, 0, .38); }
 .lint-drawer { width: min(680px, 94vw); height: 100%; overflow: auto; padding: 22px; color: var(--text); background: var(--surface); box-shadow: -18px 0 60px rgba(0, 0, 0, .22); }
@@ -654,6 +686,8 @@ h1 {
   .schema-panel { grid-template-columns: 1fr; }
   .generic-topline { align-items: flex-start; }
   .rich-problems .problems-heading label { margin-left: 0; }
+  .problem-tools { width: 100%; margin-left: 0; }
+  .problem-tools button { flex: 1 1 auto; justify-content: center; }
   .problem-summary { grid-template-columns: auto minmax(0, 1fr); }
   .problem-summary button { grid-column: 2; justify-self: start; }
   .problem-detail { margin-left: 28px; }

@@ -50,6 +50,18 @@ describe("diagnosticLines", () => {
       },
     ]);
   });
+
+  it("does not highlight diagnostics without a configuration source location", () => {
+    const state = EditorState.create({ doc: "model = true\n" });
+    expect(diagnosticLines(state.doc, [{
+      ...diagnosticDetails,
+      from: 0,
+      to: 0,
+      hasSourceLocation: false,
+      message: "Schema compiler failure",
+      severity: "error",
+    }])).toEqual([]);
+  });
 });
 
 describe("shouldValidateTransactions", () => {

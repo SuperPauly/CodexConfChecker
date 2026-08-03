@@ -119,6 +119,8 @@ describe("ValidatorWorkbench", () => {
 
     expect(editor).toHaveValue('model = "unterminated');
     expect(screen.getByRole("alert")).toHaveTextContent(/unexpected end/i);
+    expect(screen.getByText("format · format/failed")).toBeVisible();
+    expect(screen.getByText(/Taplo could not format the document/i)).toBeVisible();
   });
 
   it("uploads a TOML file, validates it, and rejects another extension", async () => {
@@ -210,20 +212,16 @@ describe("ValidatorWorkbench", () => {
     expect(screen.getByText(/valid for v0\.147\.0-alpha\.4/i)).toBeVisible();
   });
 
-  it("switches between System, Light, and Dark themes and persists an explicit choice", async () => {
+  it("applies the selected Rainglow preset to the complete website", async () => {
     const user = userEvent.setup();
     render(<ValidatorWorkbench engine={createEngine()} manifest={manifest} />);
 
-    const theme = screen.getByRole("group", { name: /^theme$/i });
-    expect(theme).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /dark/i }));
+    await user.selectOptions(screen.getByLabelText(/website theme/i), "github-light");
 
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(localStorage.getItem("codex-config-checker-theme")).toBe("dark");
-    expect(screen.getByRole("button", { name: /dark/i })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(document.documentElement.dataset.rainglowTheme).toBe("github-light");
+    expect(document.documentElement.style.getPropertyValue("--page")).toBe("#ffffff");
+    expect(localStorage.getItem("codex-config-checker.editor-theme")).toBe("github-light");
+    expect(screen.queryByRole("group", { name: /^theme$/i })).not.toBeInTheDocument();
   });
 });
 
@@ -234,5 +232,14 @@ describe("ApplicationWorkbench", () => {
     await userEvent.click(screen.getByRole("tab", { name: /json schema workbench/i }));
     expect(screen.getByRole("heading", { name: "JSON Schema Workbench" })).toBeVisible();
     expect(screen.getByLabelText(/configuration format/i)).toBeVisible();
+  });
+
+  it("shares one Rainglow website theme across both workbenches", async () => {
+    render(<ApplicationWorkbench engine={createEngine()} manifest={manifest} />);
+    await userEvent.selectOptions(screen.getByLabelText(/website theme/i), "github-light");
+    await userEvent.click(screen.getByRole("tab", { name: /json schema workbench/i }));
+
+    expect(screen.getByLabelText(/website theme/i)).toHaveValue("github-light");
+    expect(document.documentElement.dataset.rainglowTheme).toBe("github-light");
   });
 });

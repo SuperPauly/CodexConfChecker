@@ -6,12 +6,9 @@ import {
   Download,
   FileUp,
   LoaderCircle,
-  Monitor,
-  Moon,
   Paintbrush,
   Palette,
   Play,
-  Sun,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
@@ -19,17 +16,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { TomlEditor } from "./editor/TomlEditor";
 import { ProblemsPanel } from "./components/ProblemsPanel";
-import { loadEditorTheme, RAINGLOW_THEMES, saveEditorTheme, type RainglowThemeId } from "./editor/rainglow";
+import { documentLevelDiagnostic } from "./diagnostics/location";
+import { diagnosticCountSummary } from "./diagnostics/summary";
+import { applyRainglowTheme, loadEditorTheme, RAINGLOW_THEMES, saveEditorTheme, type RainglowThemeId } from "./editor/rainglow";
 import { parseSchemaManifest, schemaAssetUrl } from "./schema/manifest";
 import type { TomlEngine } from "./taplo/service";
 import type { Diagnostic } from "./taplo/types";
 import type { SchemaChannel, SchemaManifest } from "./types/schema";
 import { GenericWorkbench } from "./workbenches/GenericWorkbench";
-import {
-  applyThemePreference,
-  loadThemePreference,
-  type ThemePreference,
-} from "./theme/theme";
 
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 const STARTER_TOML = '# Paste or upload your Codex config.toml\nmodel = "gpt-5"\n';
@@ -69,9 +63,11 @@ function readTextFile(file: File): Promise<string> {
 export interface ValidatorWorkbenchProps {
   readonly engine: TomlEngine;
   readonly manifest: SchemaManifest;
+  readonly onThemeChange?: (themeId: RainglowThemeId) => void;
+  readonly themeId?: RainglowThemeId;
 }
 
-export function ValidatorWorkbench({ engine, manifest }: ValidatorWorkbenchProps) {
+export function ValidatorWorkbench({ engine, manifest, onThemeChange, themeId }: ValidatorWorkbenchProps) {
   const [toml, setToml] = useState(STARTER_TOML);
   const [channel, setChannel] = useState<SchemaChannel>("stable");
   const [diagnostics, setDiagnostics] = useState<readonly Diagnostic[]>([]);
@@ -79,10 +75,21 @@ export function ValidatorWorkbench({ engine, manifest }: ValidatorWorkbenchProps
     type: "idle",
     message: "Ready. Your configuration stays in this browser.",
   });
-  const [editorTheme, setEditorTheme] = useState<RainglowThemeId>(() => loadEditorTheme());
+  const [localTheme, setLocalTheme] = useState<RainglowThemeId>(() => loadEditorTheme());
+  const editorTheme = themeId ?? localTheme;
   const editorRef = useRef<EditorView | null>(null);
   const validationSequence = useRef(0);
   const tomlRef = useRef(toml);
+
+  useEffect(() => {
+    applyRainglowTheme(editorTheme);
+  }, [editorTheme]);
+
+  const selectTheme = (next: RainglowThemeId) => {
+    saveEditorTheme(next);
+    if (onThemeChange) onThemeChange(next);
+    else setLocalTheme(next);
+  };
 
   const validate = useCallback(
     async (nextToml = tomlRef.current, nextChannel = channel) => {
@@ -103,7 +110,7 @@ export function ValidatorWorkbench({ engine, manifest }: ValidatorWorkbenchProps
         } else {
           setStatus({
             type: "invalid",
-            message: `${result.diagnostics.length} ${result.diagnostics.length === 1 ? "problem" : "problems"} found`,
+            message: `${diagnosticCountSummary(result.diagnostics)} found`,
           });
         }
       } catch (error) {
@@ -135,9 +142,19 @@ export function ValidatorWorkbench({ engine, manifest }: ValidatorWorkbenchProps
       updateToml(formatted);
       void validate(formatted, channel);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setDiagnostics([documentLevelDiagnostic(
+        tomlRef.current,
+        "error",
+        "format",
+        "format/failed",
+        message,
+        "Taplo could not format the document because its current TOML structure is invalid.",
+        "Correct the TOML syntax error, then run Format again.",
+      )]);
       setStatus({
         type: "error",
-        message: error instanceof Error ? error.message : String(error),
+        message,
       });
     }
   };
@@ -198,7 +215,7 @@ export function ValidatorWorkbench({ engine, manifest }: ValidatorWorkbenchProps
             <h1 id="checker-title">Codex Config Checker</h1>
             <p className="lede">Validate and format Codex CLI TOML without uploading it.</p>
           </div>
-          <div className="heading-controls"><label className="editor-theme-select"><Palette aria-hidden="true" size={16} /><span>Editor colours</span><select aria-label="Codex editor colour theme" value={editorTheme} onChange={(event) => { const next = event.target.value as RainglowThemeId; setEditorTheme(next); saveEditorTheme(next); }}><optgroup label="Dark themes">{RAINGLOW_THEMES.filter((theme) => theme.variant === "dark").map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}</optgroup><optgroup label="Light themes">{RAINGLOW_THEMES.filter((theme) => theme.variant === "light").map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}</optgroup></select></label><ThemeControl /></div>
+          <div className="heading-controls"><ThemeSelect onChange={selectTheme} value={editorTheme} /></div>
         </div>
 
         <fieldset className="schema-picker">
@@ -282,56 +299,26 @@ export function ValidatorWorkbench({ engine, manifest }: ValidatorWorkbenchProps
 
 export function ApplicationWorkbench({ engine, manifest }: ValidatorWorkbenchProps) {
   const [tab, setTab] = useState<"codex" | "generic">("codex");
+  const [themeId, setThemeId] = useState<RainglowThemeId>(() => loadEditorTheme());
+  const changeTheme = (next: RainglowThemeId) => {
+    setThemeId(next);
+    saveEditorTheme(next);
+  };
+  useEffect(() => {
+    applyRainglowTheme(themeId);
+  }, [themeId]);
   return <div className="application-shell">
     <nav aria-label="Validator mode" className="mode-tabs">
       <button aria-selected={tab === "codex"} onClick={() => setTab("codex")} role="tab" type="button"><strong>Codex Config</strong><span>Release schemas</span></button>
       <button aria-selected={tab === "generic"} onClick={() => setTab("generic")} role="tab" type="button"><strong>JSON Schema Workbench</strong><span>JSON · YAML · TOML</span></button>
     </nav>
-    {tab === "codex" ? <ValidatorWorkbench engine={engine} manifest={manifest} /> : <main className="app-shell"><section className="tool-card"><div className="generic-topline"><h1>Config Checker</h1><ThemeControl /></div><GenericWorkbench engine={engine} /></section></main>}
+    {tab === "codex" ? <ValidatorWorkbench engine={engine} manifest={manifest} onThemeChange={changeTheme} themeId={themeId} /> : <main className="app-shell"><section className="tool-card"><div className="generic-topline"><h1>Config Checker</h1></div><GenericWorkbench engine={engine} onThemeChange={changeTheme} themeId={themeId} /></section></main>}
   </div>;
 }
 
-function ThemeControl() {
-  const [preference, setPreference] = useState<ThemePreference>(() =>
-    loadThemePreference(),
-  );
-  const [systemPrefersDark, setSystemPrefersDark] = useState(
-    () => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false,
-  );
-
-  useEffect(() => {
-    applyThemePreference(preference, systemPrefersDark);
-  }, [preference, systemPrefersDark]);
-
-  useEffect(() => {
-    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
-    if (!media) return undefined;
-    const update = (event: MediaQueryListEvent) => setSystemPrefersDark(event.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  const choices = [
-    { value: "system", label: "System", icon: Monitor },
-    { value: "light", label: "Light", icon: Sun },
-    { value: "dark", label: "Dark", icon: Moon },
-  ] as const;
-
+function ThemeSelect({ onChange, value }: { readonly onChange: (themeId: RainglowThemeId) => void; readonly value: RainglowThemeId }) {
   return (
-    <div aria-label="Theme" className="theme-control" role="group">
-      {choices.map(({ value, label, icon: Icon }) => (
-        <button
-          aria-pressed={preference === value}
-          key={value}
-          onClick={() => setPreference(value)}
-          title={`${label} theme`}
-          type="button"
-        >
-          <Icon aria-hidden="true" size={15} />
-          <span>{label}</span>
-        </button>
-      ))}
-    </div>
+    <label className="editor-theme-select"><Palette aria-hidden="true" size={16} /><span>Website theme</span><select aria-label="Website theme" value={value} onChange={(event) => onChange(event.target.value as RainglowThemeId)}><optgroup label="Dark themes">{RAINGLOW_THEMES.filter((theme) => theme.variant === "dark").map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}</optgroup><optgroup label="Light themes">{RAINGLOW_THEMES.filter((theme) => theme.variant === "light").map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}</optgroup></select></label>
   );
 }
 

@@ -44,6 +44,7 @@ function diagnosticExtensions(
   const lines = new Map<number, DiagnosticSeverity>();
   const maximumOffset = Math.max(0, doc.length - 1);
   for (const diagnostic of diagnostics) {
+    if (diagnostic.hasSourceLocation === false) continue;
     const line = doc.lineAt(Math.min(Math.max(0, diagnostic.from), maximumOffset));
     const current = lines.get(line.from);
     if (!current || severityRank[diagnostic.severity] > severityRank[current]) {

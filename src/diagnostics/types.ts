@@ -17,6 +17,7 @@ export interface SourceRange {
 }
 
 export interface Diagnostic extends SourceRange {
+  readonly hasSourceLocation?: boolean;
   readonly severity: DiagnosticSeverity;
   readonly source: DiagnosticSource;
   readonly ruleId: string;

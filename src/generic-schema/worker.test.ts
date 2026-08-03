@@ -42,4 +42,77 @@ describe("validateSchemaRequest", () => {
     });
     expect(result.problems.some((problem) => problem.instancePath === "/server/port" && problem.keyword === "type")).toBe(true);
   });
+
+  it("compiles the Codex uint format instead of returning a schema compiler error", () => {
+    const result = validateSchemaRequest({
+      requestId: 6,
+      value: { max_concurrent_threads_per_session: 8 },
+      primary: {
+        fileName: "config.schema.json",
+        schema: {
+          $schema: "https://json-schema.org/draft/2020-12/schema",
+          type: "object",
+          properties: {
+            max_concurrent_threads_per_session: { type: "integer", format: "uint" },
+          },
+        },
+      },
+      dependencies: [],
+      referenceMode: "internal",
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.problems).toEqual([]);
+  });
+
+  it.each([
+    ["uint", 0, -1],
+    ["uint16", 65_535, 65_536],
+    ["uint32", 4_294_967_295, 4_294_967_296],
+    ["uint64", Number.MAX_SAFE_INTEGER, -1],
+    ["int32", 2_147_483_647, 2_147_483_648],
+    ["int64", Number.MIN_SAFE_INTEGER, Number.MIN_SAFE_INTEGER - 1],
+    ["double", 1.25, Number.POSITIVE_INFINITY],
+  ])("enforces the Codex numeric format %s", (format, accepted, rejected) => {
+    const schema = {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: format === "double" ? "number" : "integer",
+      format,
+    };
+    const valid = validateSchemaRequest({ requestId: 7, value: accepted, primary: { fileName: "schema.json", schema }, dependencies: [], referenceMode: "internal" });
+    const invalid = validateSchemaRequest({ requestId: 8, value: rejected, primary: { fileName: "schema.json", schema }, dependencies: [], referenceMode: "internal" });
+
+    expect(valid.valid).toBe(true);
+    expect(valid.problems).toEqual([]);
+    expect(invalid.valid).toBe(false);
+    expect(invalid.problems[0]).toMatchObject(format === "double"
+      ? { keyword: "type", params: { type: "number" } }
+      : { keyword: "format", params: { format } });
+  });
+
+  it("treats an unknown custom format as an annotation and still validates structure", () => {
+    const result = validateSchemaRequest({
+      requestId: 9,
+      value: "ab",
+      primary: {
+        fileName: "schema.json",
+        schema: {
+          $schema: "https://json-schema.org/draft/2020-12/schema",
+          type: "string",
+          format: "project-slug",
+          minLength: 3,
+        },
+      },
+      dependencies: [],
+      referenceMode: "internal",
+    });
+
+    expect(result.problems.some((problem) => problem.keyword === "schema-compile")).toBe(false);
+    expect(result.problems.some((problem) => problem.keyword === "minLength")).toBe(true);
+    expect(result.notices).toContainEqual(expect.objectContaining({
+      ruleId: "schema/format-annotation",
+      severity: "info",
+      message: expect.stringContaining("project-slug"),
+    }));
+  });
 });

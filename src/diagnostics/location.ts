@@ -1,4 +1,4 @@
-import type { SourceRange } from "./types";
+import type { Diagnostic, DiagnosticSeverity, DiagnosticSource, SourceRange } from "./types";
 
 export function offsetPosition(
   source: string,
@@ -32,7 +32,28 @@ export function rangeFromOffsets(
   };
 }
 
-export function displayValue(value: unknown, maximumLength = 160): string {
+export function documentLevelDiagnostic(
+  sourceText: string,
+  severity: DiagnosticSeverity,
+  source: DiagnosticSource,
+  ruleId: string,
+  message: string,
+  explanation: string,
+  suggestion?: string,
+): Diagnostic {
+  return {
+    ...rangeFromOffsets(sourceText, 0, Math.min(1, sourceText.length)),
+    hasSourceLocation: false,
+    severity,
+    source,
+    ruleId,
+    message,
+    explanation,
+    ...(suggestion ? { suggestion } : {}),
+  };
+}
+
+export function displayValue(value: unknown, maximumLength = Number.POSITIVE_INFINITY): string {
   if (value === undefined) return "undefined";
   let rendered: string;
   try {

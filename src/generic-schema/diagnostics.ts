@@ -53,6 +53,13 @@ export function translateSchemaProblem(problem: SchemaProblem, context: SchemaDi
     dataPath,
     schemaPath: problem.schemaPath,
   };
+  if (problem.keyword === "schema-compile" || problem.keyword === "schema-invalid" || problem.keyword === "schema-draft") return {
+    ...base,
+    hasSourceLocation: false,
+    message: problem.message,
+    explanation: "The uploaded JSON Schema could not be used, so the configuration itself was not validated against it.",
+    suggestion: "Correct the uploaded JSON Schema, then run validation again.",
+  };
   if (problem.keyword === "required" && missing) return {
     ...base,
     message: `Missing required property \`${missing}\` at \`${problem.instancePath || "/"}\`.`,

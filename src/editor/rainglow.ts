@@ -83,6 +83,49 @@ export function saveEditorTheme(themeId: RainglowThemeId): void {
   localStorage.setItem(EDITOR_THEME_KEY, themeId);
 }
 
+export function applyRainglowTheme(
+  themeId: RainglowThemeId,
+  root: HTMLElement = document.documentElement,
+): RainglowTheme {
+  const theme = RAINGLOW_THEMES.find((candidate) => candidate.id === themeId) ?? RAINGLOW_THEMES[0];
+  const { colours } = theme;
+  const mix = (foreground: string, amount: number, background = colours.background) =>
+    `color-mix(in srgb, ${foreground} ${amount}%, ${background})`;
+  const variables: Readonly<Record<string, string>> = {
+    "--page": colours.background,
+    "--surface": mix(colours.foreground, theme.variant === "dark" ? 5 : 2),
+    "--surface-raised": mix(colours.foreground, theme.variant === "dark" ? 10 : 5),
+    "--border": mix(colours.foreground, theme.variant === "dark" ? 18 : 20),
+    "--border-strong": mix(colours.foreground, theme.variant === "dark" ? 34 : 38),
+    "--text": colours.foreground,
+    "--muted": mix(colours.foreground, 68),
+    "--quiet": mix(colours.accent, theme.variant === "dark" ? 18 : 12),
+    "--focus": colours.accent,
+    "--primary": colours.foreground,
+    "--primary-text": colours.background,
+    "--success": colours.string,
+    "--success-bg": mix(colours.string, 16),
+    "--danger": colours.keyword,
+    "--danger-bg": mix(colours.keyword, 16),
+    "--danger-line": mix(colours.keyword, 24),
+    "--warning": colours.number,
+    "--warning-bg": mix(colours.number, 16),
+    "--info": colours.property,
+    "--info-bg": mix(colours.property, 16),
+    "--editor": colours.background,
+    "--editor-border": mix(colours.accent, 35),
+    "--editor-text": colours.foreground,
+    "--editor-gutter": mix("#000000", theme.variant === "dark" ? 24 : 4),
+    "--editor-muted": colours.comment,
+    "--shadow": theme.variant === "dark" ? "0 20px 56px rgba(0, 0, 0, 0.38)" : `0 18px 50px ${mix(colours.foreground, 12, "transparent")}`,
+  };
+  for (const [name, value] of Object.entries(variables)) root.style.setProperty(name, value);
+  root.dataset.rainglowTheme = theme.id;
+  root.dataset.theme = theme.variant;
+  root.style.colorScheme = theme.variant;
+  return theme;
+}
+
 export function editorThemeExtension(themeId: RainglowThemeId): Extension {
   const theme = RAINGLOW_THEMES.find((candidate) => candidate.id === themeId) ?? RAINGLOW_THEMES[0];
   const { colours } = theme;

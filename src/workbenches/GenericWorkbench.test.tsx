@@ -22,7 +22,7 @@ describe("GenericWorkbench", () => {
   it("selects JSON, YAML, TOML, or automatic detection and offers all 20 themes", async () => {
     render(<GenericWorkbench engine={engine} />);
     expect(screen.getByLabelText(/configuration format/i)).toHaveValue("auto");
-    expect(screen.getByLabelText(/editor colour theme/i).querySelectorAll("option")).toHaveLength(20);
+    expect(screen.getByLabelText(/website theme/i).querySelectorAll("option")).toHaveLength(20);
     await userEvent.selectOptions(screen.getByLabelText(/configuration format/i), "yaml");
     expect(screen.getByRole("textbox", { name: /yaml configuration editor/i })).toBeVisible();
   });

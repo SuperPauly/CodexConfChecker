@@ -14,6 +14,19 @@ const diagnostics: Diagnostic[] = [{
   expected: "integer", actual: '"443"', dataPath: "/port", schemaPath: "#/properties/port/type",
 }];
 
+const warning: Diagnostic = {
+  from: 20, to: 21, line: 3, column: 1, endLine: 3, endColumn: 2,
+  severity: "warning", source: "lint", ruleId: "lint/example",
+  message: "Warning message", explanation: "Complete warning explanation.",
+};
+
+const information: Diagnostic = {
+  from: 0, to: 0, line: 1, column: 1, endLine: 1, endColumn: 1,
+  hasSourceLocation: false,
+  severity: "info", source: "schema", ruleId: "schema/format-annotation",
+  message: "Custom format treated as annotation", explanation: "Complete information explanation.",
+};
+
 it("shows actionable diagnostic detail and navigates to the source", async () => {
   const onVisit = vi.fn();
   render(<ProblemsPanel diagnostics={diagnostics} onVisit={onVisit} />);
@@ -28,4 +41,44 @@ it("filters by severity", async () => {
   render(<ProblemsPanel diagnostics={diagnostics} onVisit={() => undefined} />);
   await userEvent.selectOptions(screen.getByLabelText(/severity filter/i), "warning");
   expect(screen.getByText(/no problems match/i)).toBeVisible();
+});
+
+it("groups findings by severity with errors open and other groups collapsible", async () => {
+  render(<ProblemsPanel diagnostics={[...diagnostics, warning, information]} onVisit={() => undefined} />);
+
+  expect(screen.getByRole("button", { name: /errors.*1/i })).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByText(/value is text/i)).toBeVisible();
+  expect(screen.getByRole("button", { name: /warnings.*1/i })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByText(/complete warning explanation/i)).not.toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: /expand all/i }));
+  expect(screen.getByText(/complete warning explanation/i)).toBeVisible();
+  expect(screen.getByText(/complete information explanation/i)).toBeVisible();
+
+  await userEvent.click(screen.getByRole("button", { name: /collapse all/i }));
+  expect(screen.queryByText(/value is text/i)).not.toBeInTheDocument();
+});
+
+it("shows complete metadata without truncation and omits false source locations", async () => {
+  const actual = `{"content":"${"x".repeat(300)}"}`;
+  render(<ProblemsPanel diagnostics={[{ ...diagnostics[0]!, actual }, information]} onVisit={() => undefined} />);
+
+  expect(screen.getByText(`Actual: ${actual}`)).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: /expand all/i }));
+  expect(screen.queryByRole("button", { name: /go to line 1/i })).not.toBeInTheDocument();
+});
+
+it("copies a complete plain text diagnostic report", async () => {
+  const writes: string[] = [];
+  const writeText = vi.fn(async (value: string) => { writes.push(value); });
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  render(<ProblemsPanel diagnostics={[...diagnostics, warning]} onVisit={() => undefined} />);
+  await userEvent.click(screen.getByRole("button", { name: /copy report/i }));
+
+  expect(writeText).toHaveBeenCalledOnce();
+  const report = writes[0] ?? "";
+  expect(report).toContain("ERROR · schema · schema/type · Ln 2:3");
+  expect(report).toContain("Why: The value is text but the schema requires an integer.");
+  expect(report).toContain("Fix: Replace the quoted text with a whole number.");
+  expect(report).toContain("WARNING · lint · lint/example · Ln 3:1");
 });

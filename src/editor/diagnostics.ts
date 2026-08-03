@@ -17,6 +17,7 @@ export function diagnosticLines(
   const maximumOffset = Math.max(0, doc.length - 1);
 
   for (const diagnostic of diagnostics) {
+    if (diagnostic.hasSourceLocation === false) continue;
     const offset = Math.min(Math.max(0, diagnostic.from), maximumOffset);
     const line = doc.lineAt(offset);
     const existing = lines.get(line.number);

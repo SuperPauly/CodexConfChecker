@@ -29,4 +29,10 @@ describe("diagnostic locations", () => {
     expect(displayValue({ enabled: true })).toBe('{"enabled":true}');
     expect(displayValue(undefined)).toBe("undefined");
   });
+
+  it("does not truncate diagnostic values by default", () => {
+    const value = { content: "x".repeat(300) };
+    expect(displayValue(value)).toBe(JSON.stringify(value));
+    expect(displayValue(value)).not.toContain("…");
+  });
 });

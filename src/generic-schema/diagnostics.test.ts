@@ -39,4 +39,22 @@ describe("schema diagnostics", () => {
     expect(additional.suggestion).toContain("Remove `debug`");
     expect(type).toMatchObject({ expected: "string", actual: "42", ruleId: "schema/type" });
   });
+
+  it("does not attach schema compiler failures to configuration line 1", () => {
+    const diagnostic = translateSchemaProblem({
+      keyword: "schema-compile",
+      instancePath: "",
+      schemaPath: "",
+      message: "JSON Schema could not be compiled: unknown format uint",
+      params: {},
+    }, { source, value: { server: { host: "localhost" } }, locations });
+
+    expect(diagnostic).toMatchObject({
+      ruleId: "schema/schema-compile",
+      hasSourceLocation: false,
+      message: "JSON Schema could not be compiled: unknown format uint",
+    });
+    expect(diagnostic.actual).toBeUndefined();
+    expect(diagnostic.suggestion).toMatch(/schema/i);
+  });
 });

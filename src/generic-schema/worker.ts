@@ -10,27 +10,76 @@ import type { SchemaNotice, SchemaProblem, SchemaValidationRequest, SchemaValida
 
 type JsonObject = Record<string, unknown>;
 
+const STANDARD_FORMATS = new Set([
+  "date", "time", "date-time", "duration", "uri", "uri-reference", "uri-template", "url",
+  "email", "hostname", "ipv4", "ipv6", "regex", "uuid", "json-pointer", "relative-json-pointer",
+  "byte", "float", "password", "binary",
+]);
+
+const CODEX_NUMERIC_FORMATS = new Set(["uint", "uint16", "uint32", "uint64", "int32", "int64", "double"]);
+
 function schemaObject(value: unknown): JsonObject | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonObject : undefined;
 }
 
-function ajvFor(schema: unknown): { ajv?: AjvCore; notice?: SchemaValidationResponse["notices"][number]; unsupported?: SchemaProblem } {
+function schemaFormats(value: unknown, formats = new Set<string>()): Set<string> {
+  if (!value || typeof value !== "object") return formats;
+  if (Array.isArray(value)) {
+    for (const item of value) schemaFormats(item, formats);
+    return formats;
+  }
+  for (const [key, child] of Object.entries(value as JsonObject)) {
+    if (key === "format" && typeof child === "string") formats.add(child);
+    else schemaFormats(child, formats);
+  }
+  return formats;
+}
+
+function integerFormat(minimum: number, maximum: number) {
+  return {
+    type: "number" as const,
+    validate: (value: number) => Number.isSafeInteger(value) && value >= minimum && value <= maximum,
+  };
+}
+
+function addSupportedFormats(ajv: AjvCore, schemas: readonly unknown[]): SchemaNotice[] {
+  addFormats(ajv);
+  ajv.addFormat("uint", integerFormat(0, Number.MAX_SAFE_INTEGER));
+  ajv.addFormat("uint16", integerFormat(0, 65_535));
+  ajv.addFormat("uint32", integerFormat(0, 4_294_967_295));
+  ajv.addFormat("uint64", integerFormat(0, Number.MAX_SAFE_INTEGER));
+  ajv.addFormat("int32", integerFormat(-2_147_483_648, 2_147_483_647));
+  ajv.addFormat("int64", integerFormat(Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER));
+  ajv.addFormat("double", { type: "number", validate: Number.isFinite });
+
+  const custom = [...schemas.reduce<Set<string>>((formats, schema) => schemaFormats(schema, formats), new Set<string>())]
+    .filter((format) => !STANDARD_FORMATS.has(format) && !CODEX_NUMERIC_FORMATS.has(format))
+    .sort();
+  for (const format of custom) ajv.addFormat(format, true);
+  return custom.length ? [{
+    ruleId: "schema/format-annotation",
+    severity: "info",
+    message: `Custom JSON Schema ${custom.length === 1 ? "format" : "formats"} treated as annotation: ${custom.join(", ")}.`,
+    explanation: "Structural validation still ran, but this validator does not assert application-specific format semantics.",
+  }] : [];
+}
+
+function ajvFor(schema: unknown, relatedSchemas: readonly unknown[]): { ajv?: AjvCore; notices: SchemaNotice[]; unsupported?: SchemaProblem } {
   const uri = schemaObject(schema)?.$schema;
   const options = { allErrors: true, strict: true, verbose: true, validateFormats: true } as const;
   let ajv: AjvCore;
   if (uri === undefined) {
     ajv = new Ajv2020(options);
-    addFormats(ajv);
-    return { ajv, notice: { ruleId: "schema/draft-default", severity: "info", message: "JSON Schema draft was not declared; Draft 2020-12 was used.", explanation: "Add a `$schema` URI when a different draft is required." } };
+    const notices = addSupportedFormats(ajv, [schema, ...relatedSchemas]);
+    return { ajv, notices: [{ ruleId: "schema/draft-default", severity: "info", message: "JSON Schema draft was not declared; Draft 2020-12 was used.", explanation: "Add a `$schema` URI when a different draft is required." }, ...notices] };
   }
   const value = String(uri);
   if (/draft-04/.test(value)) ajv = new AjvDraft04(options) as AjvCore;
   else if (/draft-07/.test(value)) ajv = new Ajv(options);
   else if (/2019-09/.test(value)) ajv = new Ajv2019(options);
   else if (/2020-12/.test(value)) ajv = new Ajv2020(options);
-  else return { unsupported: { keyword: "schema-draft", instancePath: "", schemaPath: "$schema", message: `Unsupported JSON Schema draft \`${value}\`. Supported drafts are 4, 7, 2019-09, and 2020-12.`, params: { draft: value } } };
-  addFormats(ajv);
-  return { ajv };
+  else return { notices: [], unsupported: { keyword: "schema-draft", instancePath: "", schemaPath: "$schema", message: `Unsupported JSON Schema draft \`${value}\`. Supported drafts are 4, 7, 2019-09, and 2020-12.`, params: { draft: value } } };
+  return { ajv, notices: addSupportedFormats(ajv, [schema, ...relatedSchemas]) };
 }
 
 function serializeErrors(errors: AjvCore["errors"]): SchemaProblem[] {
@@ -62,8 +111,8 @@ export function validateSchemaRequest(request: SchemaValidationRequest): SchemaV
       notices,
       problems: referenceIssues.map((issue) => ({ keyword: issue.ruleId.split("/").at(-1) ?? "reference", instancePath: "", schemaPath: "$ref", message: issue.message, params: { reference: issue.reference } })),
     };
-    const { ajv, notice, unsupported } = ajvFor(request.primary.schema);
-    if (notice) notices.push(notice);
+    const { ajv, notices: formatNotices, unsupported } = ajvFor(request.primary.schema, request.dependencies.map((dependency) => dependency.schema));
+    notices.push(...formatNotices);
     if (!ajv || unsupported) return { requestId: request.requestId, valid: false, notices, problems: unsupported ? [unsupported] : [] };
     const prepared = prepareSchemas(request.primary.schema, request.primary.fileName, request.dependencies);
     const draft04 = /draft-04/.test(String(schemaObject(request.primary.schema)?.$schema ?? ""));
