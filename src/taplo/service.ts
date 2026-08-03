@@ -45,42 +45,98 @@ function diagnosticRange(toml: string, range: unknown): [number, number] {
   return [0, 0];
 }
 
-function inferredSchemaRange(toml: string, message: string): [number, number] {
-  const unexpectedKey = message.match(/\('([^']+)' was unexpected\)/)?.[1];
-  if (unexpectedKey) {
-    const escapedKey = unexpectedKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const match = new RegExp(`(?:^|\\n)([ \\t]*)(?:${escapedKey}|["']${escapedKey}["'])[ \\t]*=`).exec(
-      toml,
-    );
-    if (match?.index !== undefined) {
-      const lineStart = match.index + (toml[match.index] === "\n" ? 1 : 0);
-      const from = lineStart + (match[1]?.length ?? 0);
-      return [from, from + unexpectedKey.length];
-    }
-  }
-
-  return [0, 0];
+interface TomlAssignment {
+  readonly key: string;
+  readonly path: string;
+  readonly value: string;
+  readonly from: number;
+  readonly to: number;
 }
 
-function toDiagnostic(toml: string, error: LintError): Diagnostic {
-  const declaredRange = diagnosticRange(toml, error.range);
-  const [from, to] =
-    declaredRange[0] === declaredRange[1]
-      ? inferredSchemaRange(toml, error.error)
-      : declaredRange;
-  const schemaFailure = /schema|additional properties|required|expected|unexpected/i.test(
-    error.error,
-  );
+function unquote(value: string): string {
+  return value.replace(/^(?:"(.*)"|'(.*)')$/, "$1$2");
+}
+
+function assignments(toml: string): readonly TomlAssignment[] {
+  const result: TomlAssignment[] = [];
+  let table = "";
+  let offset = 0;
+  for (const line of toml.split("\n")) {
+    const tableMatch = /^\s*\[\[?([^\]]+)\]\]?\s*(?:#.*)?$/.exec(line);
+    if (tableMatch?.[1]) {
+      table = tableMatch[1].trim();
+    } else if (!/^\s*#/.test(line)) {
+      const match = /^\s*((?:[A-Za-z0-9_.-]+)|(?:"[^"]+")|(?:'[^']+'))\s*=\s*(.*?)\s*$/.exec(line);
+      if (match?.[1] && match[2] !== undefined) {
+        const key = unquote(match[1]);
+        const keyStart = line.indexOf(match[1]);
+        const value = match[2].replace(/\s+#.*$/, "").trim();
+        result.push({ key, path: table ? `${table}.${key}` : key, value, from: offset + keyStart, to: offset + line.length });
+      }
+    }
+    offset += line.length + 1;
+  }
+  return result;
+}
+
+function uniqueAssignment(items: readonly TomlAssignment[]): TomlAssignment | undefined {
+  return items.length === 1 ? items[0] : undefined;
+}
+
+function unexpectedProperties(message: string): readonly string[] {
+  if (!/additional properties are not allowed/i.test(message)) return [];
+  return [...message.matchAll(/'([^']+)'/g)].flatMap((match) => match[1] ? [match[1]] : []);
+}
+
+function diagnostic(
+  toml: string,
+  message: string,
+  range: readonly [number, number],
+  suggestion?: string,
+): Diagnostic {
+  const schemaFailure = /schema|additional properties|required|is not of type|must be .*received/i.test(message);
   return {
-    ...rangeFromOffsets(toml, from, to),
-    message: error.error,
+    ...rangeFromOffsets(toml, range[0], range[1]),
+    message,
     explanation: schemaFailure
       ? "The TOML value does not satisfy the selected JSON Schema constraint."
       : "Taplo could not parse this TOML structure or found conflicting keys.",
+    ...(suggestion ? { suggestion } : {}),
     ruleId: schemaFailure ? "taplo/schema" : "taplo/syntax",
     source: schemaFailure ? "schema" : "syntax",
     severity: "error",
   };
+}
+
+function toDiagnostics(toml: string, error: LintError): Diagnostic[] {
+  const declaredRange = diagnosticRange(toml, error.range);
+  if (declaredRange[0] !== declaredRange[1]) return [diagnostic(toml, error.error, declaredRange)];
+
+  const documentAssignments = assignments(toml);
+  const unexpected = unexpectedProperties(error.error);
+  if (unexpected.length) return unexpected.map((key) => {
+    const assignment = uniqueAssignment(documentAssignments.filter((item) => item.key === key));
+    const range: [number, number] = assignment ? [assignment.from, assignment.to] : [0, 0];
+    return diagnostic(
+      toml,
+      `Property \`${assignment?.path ?? key}\` is not allowed by the selected Codex schema.`,
+      range,
+      `Remove \`${assignment?.path ?? key}\` or select a Codex release whose schema declares it.`,
+    );
+  });
+
+  const typeFailure = /^(.*?) is not of type "([^"]+)"$/.exec(error.error);
+  if (typeFailure?.[1] && typeFailure[2]) {
+    const assignment = uniqueAssignment(documentAssignments.filter((item) => item.value === typeFailure[1]));
+    if (assignment) return [diagnostic(
+      toml,
+      `Value for \`${assignment.path}\` must be ${typeFailure[2]}; received ${typeFailure[1]}.`,
+      [assignment.from, assignment.to],
+      `Remove \`${assignment.path}\` or replace it with a TOML ${typeFailure[2]} accepted by the selected Codex schema.`,
+    )];
+  }
+
+  return [diagnostic(toml, error.error, [0, 0])];
 }
 
 function normalizeError(error: unknown): Error {
@@ -111,7 +167,7 @@ export class TaploService implements TomlEngine {
       const result = await this.#taplo.lint(toml, {
         config: { schema: { enabled: true, url: schemaUrl } },
       });
-      return { diagnostics: result.errors.map((error) => toDiagnostic(toml, error)) };
+      return { diagnostics: result.errors.flatMap((error) => toDiagnostics(toml, error)) };
     } catch (error) {
       throw normalizeError(error);
     }

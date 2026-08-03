@@ -8,6 +8,11 @@ const schema = {
   additionalProperties: false,
   properties: {
     model: { type: "string", enum: ["gpt-5", "gpt-5-mini"] },
+    agents: {
+      type: "object",
+      properties: { max_depth: { type: "integer" } },
+      additionalProperties: { type: "object" },
+    },
   },
 };
 
@@ -79,6 +84,29 @@ describe("TaploService", () => {
 
     expect(syntax.diagnostics.length).toBeGreaterThan(0);
     expect(duplicate.diagnostics.length).toBeGreaterThan(0);
+  });
+
+  it("infers real lines when Taplo omits ranges for schema diagnostics", async () => {
+    const service = await TaploService.initialize();
+    const toml = [
+      "legacy_one = true",
+      "legacy_two = false",
+      "[agents]",
+      "max_threads = 8",
+      "job_max_runtime_seconds = 1800",
+      "",
+    ].join("\n");
+
+    const result = await service.validate(toml, "https://schema.test/config.schema.json");
+
+    expect(result.diagnostics).toHaveLength(4);
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ message: expect.stringContaining("legacy_one"), line: 1 }),
+      expect.objectContaining({ message: expect.stringContaining("legacy_two"), line: 2 }),
+      expect.objectContaining({ message: expect.stringContaining("agents.max_threads"), line: 4, source: "schema" }),
+      expect.objectContaining({ message: expect.stringContaining("agents.job_max_runtime_seconds"), line: 5, source: "schema" }),
+    ]));
+    expect(result.diagnostics.every((diagnostic) => diagnostic.from > 0 || diagnostic.line === 1)).toBe(true);
   });
 
   it("formats valid TOML and refuses malformed TOML", async () => {
