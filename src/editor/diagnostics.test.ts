@@ -3,6 +3,16 @@ import { describe, expect, it } from "vitest";
 
 import { diagnosticLines, shouldValidateTransactions } from "./diagnostics";
 
+const diagnosticDetails = {
+  line: 1,
+  column: 1,
+  endLine: 1,
+  endColumn: 1,
+  explanation: "Test diagnostic.",
+  ruleId: "test/diagnostic",
+  source: "lint" as const,
+};
+
 describe("diagnosticLines", () => {
   it("maps each diagnostic to the complete affected line", () => {
     const state = EditorState.create({
@@ -11,7 +21,7 @@ describe("diagnosticLines", () => {
 
     expect(
       diagnosticLines(state.doc, [
-        { from: 17, to: 28, message: "Unknown key", severity: "error" },
+        { ...diagnosticDetails, from: 17, to: 28, message: "Unknown key", severity: "error" },
       ]),
     ).toEqual([
       {
@@ -28,8 +38,8 @@ describe("diagnosticLines", () => {
 
     expect(
       diagnosticLines(state.doc, [
-        { from: 999, to: 999, message: "One", severity: "error" },
-        { from: 0, to: 2, message: "Two", severity: "error" },
+        { ...diagnosticDetails, from: 999, to: 999, message: "One", severity: "error" },
+        { ...diagnosticDetails, from: 0, to: 2, message: "Two", severity: "error" },
       ]),
     ).toEqual([
       {

@@ -1,10 +1,13 @@
 import { Taplo, type LintError } from "@taplo/lib";
 
-import type { Diagnostic, ValidationResult } from "./types";
+import { rangeFromOffsets } from "../diagnostics/location";
+import type { Diagnostic } from "../diagnostics/types";
+import type { ValidationResult } from "./types";
 
 export interface TomlEngine {
   validate(toml: string, schemaUrl: string): Promise<ValidationResult>;
   format(toml: string): string;
+  decode(toml: string): unknown;
 }
 
 interface RangeObject {
@@ -65,10 +68,17 @@ function toDiagnostic(toml: string, error: LintError): Diagnostic {
     declaredRange[0] === declaredRange[1]
       ? inferredSchemaRange(toml, error.error)
       : declaredRange;
+  const schemaFailure = /schema|additional properties|required|expected|unexpected/i.test(
+    error.error,
+  );
   return {
-    from,
-    to,
+    ...rangeFromOffsets(toml, from, to),
     message: error.error,
+    explanation: schemaFailure
+      ? "The TOML value does not satisfy the selected JSON Schema constraint."
+      : "Taplo could not parse this TOML structure or found conflicting keys.",
+    ruleId: schemaFailure ? "taplo/schema" : "taplo/syntax",
+    source: schemaFailure ? "schema" : "syntax",
     severity: "error",
   };
 }
@@ -111,6 +121,14 @@ export class TaploService implements TomlEngine {
     try {
       this.#taplo.decode(toml);
       return this.#taplo.format(toml);
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  }
+
+  decode(toml: string): unknown {
+    try {
+      return this.#taplo.decode(toml);
     } catch (error) {
       throw normalizeError(error);
     }

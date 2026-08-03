@@ -9,6 +9,7 @@ import {
   Monitor,
   Moon,
   Paintbrush,
+  Palette,
   Play,
   Sun,
   Trash2,
@@ -17,10 +18,13 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { TomlEditor } from "./editor/TomlEditor";
+import { ProblemsPanel } from "./components/ProblemsPanel";
+import { loadEditorTheme, RAINGLOW_THEMES, saveEditorTheme, type RainglowThemeId } from "./editor/rainglow";
 import { parseSchemaManifest, schemaAssetUrl } from "./schema/manifest";
 import type { TomlEngine } from "./taplo/service";
 import type { Diagnostic } from "./taplo/types";
 import type { SchemaChannel, SchemaManifest } from "./types/schema";
+import { GenericWorkbench } from "./workbenches/GenericWorkbench";
 import {
   applyThemePreference,
   loadThemePreference,
@@ -41,13 +45,6 @@ function absoluteSchemaUrl(channel: SchemaChannel, sha256: string): string {
   const url = new URL(schemaAssetUrl(channel), window.location.href);
   url.searchParams.set("sha", sha256);
   return url.href;
-}
-
-function lineAndColumn(text: string, offset: number): { line: number; column: number } {
-  const safeOffset = Math.min(Math.max(0, offset), Math.max(0, text.length));
-  const before = text.slice(0, safeOffset);
-  const lines = before.split("\n");
-  return { line: lines.length, column: (lines.at(-1)?.length ?? 0) + 1 };
 }
 
 function downloadToml(text: string) {
@@ -82,6 +79,7 @@ export function ValidatorWorkbench({ engine, manifest }: ValidatorWorkbenchProps
     type: "idle",
     message: "Ready. Your configuration stays in this browser.",
   });
+  const [editorTheme, setEditorTheme] = useState<RainglowThemeId>(() => loadEditorTheme());
   const editorRef = useRef<EditorView | null>(null);
   const validationSequence = useRef(0);
   const tomlRef = useRef(toml);
@@ -179,10 +177,6 @@ export function ValidatorWorkbench({ engine, manifest }: ValidatorWorkbenchProps
     editorRef.current?.focus();
   };
 
-  const affectedLineCount = new Set(
-    diagnostics.map((diagnostic) => lineAndColumn(toml, diagnostic.from).line),
-  ).size;
-
   const visitDiagnostic = (diagnostic: Diagnostic) => {
     const editor = editorRef.current;
     if (!editor) return;
@@ -204,7 +198,7 @@ export function ValidatorWorkbench({ engine, manifest }: ValidatorWorkbenchProps
             <h1 id="checker-title">Codex Config Checker</h1>
             <p className="lede">Validate and format Codex CLI TOML without uploading it.</p>
           </div>
-          <ThemeControl />
+          <div className="heading-controls"><label className="editor-theme-select"><Palette aria-hidden="true" size={16} /><span>Editor colours</span><select aria-label="Codex editor colour theme" value={editorTheme} onChange={(event) => { const next = event.target.value as RainglowThemeId; setEditorTheme(next); saveEditorTheme(next); }}><optgroup label="Dark themes">{RAINGLOW_THEMES.filter((theme) => theme.variant === "dark").map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}</optgroup><optgroup label="Light themes">{RAINGLOW_THEMES.filter((theme) => theme.variant === "light").map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}</optgroup></select></label><ThemeControl /></div>
         </div>
 
         <fieldset className="schema-picker">
@@ -266,6 +260,7 @@ export function ValidatorWorkbench({ engine, manifest }: ValidatorWorkbenchProps
               editorRef.current = editor;
             }}
             onValidationTrigger={() => void validate()}
+            themeId={editorTheme}
             value={toml}
           />
         </div>
@@ -277,35 +272,23 @@ export function ValidatorWorkbench({ engine, manifest }: ValidatorWorkbenchProps
           <span>{status.message}</span>
         </div>
 
-        <section className="problems" aria-labelledby="problems-title">
-          <div className="problems-heading">
-            <h2 id="problems-title">Problems</h2>
-            <span>{diagnostics.length}</span>
-          </div>
-          {diagnostics.length === 0 ? (
-            <p className="empty-problems">No reported problems.</p>
-          ) : (
-            <ol>
-              {diagnostics.map((diagnostic, index) => {
-                const position = lineAndColumn(toml, diagnostic.from);
-                return (
-                  <li key={`${diagnostic.from}-${diagnostic.message}-${index}`}>
-                    <button onClick={() => visitDiagnostic(diagnostic)} type="button">
-                      <span>Ln {position.line}, Col {position.column}</span>
-                      {diagnostic.message}
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-          <span className="visually-hidden">{affectedLineCount} affected lines</span>
-        </section>
+        <ProblemsPanel diagnostics={diagnostics} onVisit={visitDiagnostic} />
 
         <p className="privacy-note">Everything runs locally in your browser. No TOML is sent to a server.</p>
       </section>
     </main>
   );
+}
+
+export function ApplicationWorkbench({ engine, manifest }: ValidatorWorkbenchProps) {
+  const [tab, setTab] = useState<"codex" | "generic">("codex");
+  return <div className="application-shell">
+    <nav aria-label="Validator mode" className="mode-tabs">
+      <button aria-selected={tab === "codex"} onClick={() => setTab("codex")} role="tab" type="button"><strong>Codex Config</strong><span>Release schemas</span></button>
+      <button aria-selected={tab === "generic"} onClick={() => setTab("generic")} role="tab" type="button"><strong>JSON Schema Workbench</strong><span>JSON · YAML · TOML</span></button>
+    </nav>
+    {tab === "codex" ? <ValidatorWorkbench engine={engine} manifest={manifest} /> : <main className="app-shell"><section className="tool-card"><div className="generic-topline"><h1>Config Checker</h1><ThemeControl /></div><GenericWorkbench engine={engine} /></section></main>}
+  </div>;
 }
 
 function ThemeControl() {
@@ -389,5 +372,5 @@ export default function App() {
   if (state.type === "error") {
     return <main className="fatal-error"><h1>Codex Config Checker</h1><p role="alert">{state.message}</p></main>;
   }
-  return <ValidatorWorkbench engine={state.engine} manifest={state.manifest} />;
+  return <ApplicationWorkbench engine={state.engine} manifest={state.manifest} />;
 }

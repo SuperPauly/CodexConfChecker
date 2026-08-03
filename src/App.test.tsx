@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
-import { ValidatorWorkbench } from "./App";
+import { ApplicationWorkbench, ValidatorWorkbench } from "./App";
 import type { TomlEngine } from "./taplo/service";
 import type { SchemaManifest } from "./types/schema";
 
@@ -42,6 +42,7 @@ function createEngine() {
   return {
     validate: vi.fn(async () => ({ diagnostics: [] })),
     format: vi.fn((toml: string) => `${toml.trim()}\n`),
+    decode: vi.fn(() => ({})),
   } satisfies TomlEngine;
 }
 
@@ -180,6 +181,7 @@ describe("ValidatorWorkbench", () => {
     const engine: TomlEngine = {
       validate: vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second),
       format: vi.fn((toml: string) => toml),
+      decode: vi.fn(() => ({})),
     };
     render(<ValidatorWorkbench engine={engine} manifest={manifest} />);
 
@@ -189,7 +191,19 @@ describe("ValidatorWorkbench", () => {
     expect(await screen.findByText(/valid for v0\.147\.0-alpha\.4/i)).toBeVisible();
 
     resolveFirst({
-      diagnostics: [{ from: 0, to: 4, message: "Old result", severity: "error" }],
+      diagnostics: [{
+        from: 0,
+        to: 4,
+        line: 1,
+        column: 1,
+        endLine: 1,
+        endColumn: 5,
+        message: "Old result",
+        explanation: "An old validation result.",
+        ruleId: "test/old",
+        source: "schema",
+        severity: "error",
+      }],
     });
     await Promise.resolve();
     expect(screen.queryByText("Old result")).not.toBeInTheDocument();
@@ -200,7 +214,7 @@ describe("ValidatorWorkbench", () => {
     const user = userEvent.setup();
     render(<ValidatorWorkbench engine={createEngine()} manifest={manifest} />);
 
-    const theme = screen.getByRole("group", { name: /theme/i });
+    const theme = screen.getByRole("group", { name: /^theme$/i });
     expect(theme).toBeVisible();
     await user.click(screen.getByRole("button", { name: /dark/i }));
 
@@ -210,5 +224,15 @@ describe("ValidatorWorkbench", () => {
       "aria-pressed",
       "true",
     );
+  });
+});
+
+describe("ApplicationWorkbench", () => {
+  it("opens Codex by default and switches to the generic JSON Schema workbench", async () => {
+    render(<ApplicationWorkbench engine={createEngine()} manifest={manifest} />);
+    expect(screen.getByRole("heading", { name: "Codex Config Checker" })).toBeVisible();
+    await userEvent.click(screen.getByRole("tab", { name: /json schema workbench/i }));
+    expect(screen.getByRole("heading", { name: "JSON Schema Workbench" })).toBeVisible();
+    expect(screen.getByLabelText(/configuration format/i)).toBeVisible();
   });
 });

@@ -1,52 +1,8 @@
-import { StreamLanguage } from "@codemirror/language";
-import { toml } from "@codemirror/legacy-modes/mode/toml";
-import { Text, type Extension } from "@codemirror/state";
-import {
-  Decoration,
-  EditorView,
-  GutterMarker,
-  gutter,
-  type DecorationSet,
-  type ViewUpdate,
-} from "@codemirror/view";
-import CodeMirror from "@uiw/react-codemirror";
-import { useMemo } from "react";
+import type { EditorView } from "@codemirror/view";
 
 import type { Diagnostic } from "../taplo/types";
-import { diagnosticLines, shouldValidateTransactions } from "./diagnostics";
-
-class ErrorGutterMarker extends GutterMarker {
-  readonly elementClass = "cm-error-gutter-marker";
-}
-
-const errorGutterMarker = new ErrorGutterMarker();
-
-function diagnosticExtensions(
-  value: string,
-  diagnostics: readonly Diagnostic[],
-): Extension[] {
-  const lineStarts = new Set<number>();
-
-  const doc = Text.of(value.split("\n"));
-  for (const line of diagnosticLines(doc, diagnostics)) {
-    lineStarts.add(line.lineFrom);
-  }
-  const decorations: DecorationSet = Decoration.set(
-    [...lineStarts].map((from) =>
-      Decoration.line({ class: "cm-invalid-line" }).range(from),
-    ),
-    true,
-  );
-
-  return [
-    EditorView.decorations.of(decorations),
-    gutter({
-      class: "cm-error-gutter",
-      lineMarker: (_view, line) =>
-        lineStarts.has(line.from) ? errorGutterMarker : null,
-    }),
-  ];
-}
+import { ConfigEditor } from "./ConfigEditor";
+import type { RainglowThemeId } from "./rainglow";
 
 export interface TomlEditorProps {
   readonly value: string;
@@ -54,6 +10,7 @@ export interface TomlEditorProps {
   readonly onChange: (value: string) => void;
   readonly onValidationTrigger: () => void;
   readonly onCreateEditor: (view: EditorView) => void;
+  readonly themeId?: RainglowThemeId;
 }
 
 export function TomlEditor({
@@ -62,38 +19,18 @@ export function TomlEditor({
   onChange,
   onValidationTrigger,
   onCreateEditor,
+  themeId = "azure",
 }: TomlEditorProps) {
-  const extensions = useMemo(
-    () => [
-      StreamLanguage.define(toml),
-      EditorView.lineWrapping,
-      EditorView.contentAttributes.of({
-        "aria-label": "Codex TOML editor",
-        spellcheck: "false",
-      }),
-      ...diagnosticExtensions(value, diagnostics),
-    ],
-    [diagnostics, value],
-  );
-
-  const handleUpdate = (update: ViewUpdate) => {
-    if (shouldValidateTransactions(update.transactions)) {
-      onValidationTrigger();
-    }
-  };
-
   return (
-    <CodeMirror
-      aria-label="Codex TOML editor"
-      className="toml-editor"
-      extensions={extensions}
-      height="100%"
-      indentWithTab={false}
-      onBlur={onValidationTrigger}
+    <ConfigEditor
+      ariaLabel="Codex TOML editor"
+      diagnostics={diagnostics}
+      language="toml"
       onChange={onChange}
       onCreateEditor={onCreateEditor}
-      onUpdate={handleUpdate}
+      onValidationTrigger={onValidationTrigger}
       placeholder={'# Paste your Codex config.toml here\nmodel = "gpt-5"'}
+      themeId={themeId}
       value={value}
     />
   );
