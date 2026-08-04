@@ -25,6 +25,14 @@ function assertString(
   return value;
 }
 
+function assertTimestamp(value: unknown, label: string): string {
+  const timestamp = assertString(value, label);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(timestamp) || Number.isNaN(Date.parse(timestamp))) {
+    throw new TypeError(`${label} must be an ISO 8601 UTC timestamp`);
+  }
+  return timestamp;
+}
+
 function parseEntry(value: unknown, channel: SchemaChannel): SchemaEntry {
   const entry = assertRecord(value, channel);
   return {
@@ -40,7 +48,19 @@ function parseEntry(value: unknown, channel: SchemaChannel): SchemaEntry {
       `${channel}.sourceUrl`,
       /^https:\/\//u,
     ),
+    syncedAt: assertTimestamp(entry.syncedAt, `${channel}.syncedAt`),
   };
+}
+
+export function formatSchemaSyncTime(timestamp: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    timeZoneName: "short",
+    year: "numeric",
+  }).format(new Date(timestamp));
 }
 
 export function parseSchemaManifest(value: unknown): SchemaManifest {

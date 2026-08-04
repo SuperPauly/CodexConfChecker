@@ -40,6 +40,8 @@ jobs:
         run: npm run check
 
       - name: Build production site
+        env:
+          VITE_GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
         run: npm run build
 
       - name: Upload Pages artifact

@@ -28,6 +28,7 @@ test("Pages workflow tests, builds, and deploys every main push", async () => {
   assert.match(yaml, /actions\/deploy-pages@[a-f0-9]{40}/);
   assert.match(yaml, /pages:\s*write/);
   assert.match(yaml, /id-token:\s*write/);
+  assert.match(yaml, /VITE_GA_MEASUREMENT_ID:\s*\$\{\{\s*vars\.GA_MEASUREMENT_ID\s*\}\}/);
 });
 
 test("every external workflow action is pinned to a full commit SHA", async () => {

@@ -234,7 +234,7 @@ h1 {
 
 .schema-picker {
   display: grid;
-  grid-template-columns: auto minmax(150px, 220px) minmax(190px, 260px);
+  grid-template-columns: auto minmax(210px, 250px) minmax(230px, 290px);
   align-items: stretch;
   gap: 10px;
   margin: 30px 0 14px;
@@ -277,13 +277,19 @@ h1 {
   accent-color: var(--focus);
 }
 
-.schema-option span { display: grid; gap: 2px; }
+.schema-option span { display: grid; gap: 3px; }
 .schema-option strong { font-size: 0.88rem; }
 
-.schema-option small {
+.schema-version {
   color: var(--muted);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.73rem;
+}
+
+.schema-sync-time {
+  color: var(--muted);
+  font-size: 0.67rem;
+  line-height: 1.35;
 }
 
 .action-bar {
@@ -606,6 +612,30 @@ h1 {
   text-align: center;
 }
 
+.analytics-consent {
+  position: fixed;
+  z-index: 200;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: min(760px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 16px 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.analytics-consent strong { font-size: 0.9rem; }
+.analytics-consent p { margin: 5px 0 0; color: var(--muted); font-size: 0.75rem; line-height: 1.45; }
+.analytics-consent-actions { display: flex; flex: 0 0 auto; gap: 8px; }
+
 .visually-hidden {
   position: absolute !important;
   width: 1px !important;
@@ -660,7 +690,8 @@ h1 {
 
   .schema-picker legend { grid-column: 1 / -1; padding-bottom: 2px; }
   .schema-option { min-width: 0; padding: 9px 10px; }
-  .schema-option small { font-size: 0.66rem; }
+  .schema-version { font-size: 0.66rem; }
+  .schema-sync-time { font-size: 0.62rem; }
 
   .action-bar {
     display: grid;
@@ -692,6 +723,8 @@ h1 {
   .problem-summary button { grid-column: 2; justify-self: start; }
   .problem-detail { margin-left: 28px; }
   .lint-drawer { width: 100vw; padding: 16px; }
+  .analytics-consent { align-items: stretch; flex-direction: column; gap: 12px; padding: 14px; }
+  .analytics-consent-actions .button { flex: 1; }
 }
 
 @media (max-width: 390px) {

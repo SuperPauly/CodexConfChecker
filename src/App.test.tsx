@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
@@ -28,12 +28,14 @@ const manifest: SchemaManifest = {
       tag: "rust-v0.146.0",
       sha256: "a".repeat(64),
       sourceUrl: "https://example.test/stable.json",
+      syncedAt: "2026-08-01T10:30:00Z",
     },
     alpha: {
       version: "v0.147.0-alpha.4",
       tag: "rust-v0.147.0-alpha.4",
       sha256: "b".repeat(64),
       sourceUrl: "https://example.test/alpha.json",
+      syncedAt: "2026-08-02T12:00:00Z",
     },
   },
 };
@@ -57,6 +59,23 @@ describe("ValidatorWorkbench", () => {
 
     expect(screen.getByRole("radio", { name: /stable.*v0\.146\.0/i })).toBeChecked();
     expect(screen.getByRole("radio", { name: /alpha.*v0\.147\.0-alpha\.4/i })).not.toBeChecked();
+  });
+
+  it("shows the exact last successful sync time for each schema channel", () => {
+    render(<ValidatorWorkbench engine={createEngine()} manifest={manifest} />);
+
+    const stable = screen.getByRole("radio", { name: /stable/i }).closest("label");
+    const alpha = screen.getByRole("radio", { name: /alpha/i }).closest("label");
+    expect(stable).not.toBeNull();
+    expect(alpha).not.toBeNull();
+    expect(within(stable!).getByText(/last synced/i).closest("time")).toHaveAttribute(
+      "datetime",
+      "2026-08-01T10:30:00Z",
+    );
+    expect(within(alpha!).getByText(/last synced/i).closest("time")).toHaveAttribute(
+      "datetime",
+      "2026-08-02T12:00:00Z",
+    );
   });
 
   it("does not validate ordinary typing, then validates on blur", async () => {

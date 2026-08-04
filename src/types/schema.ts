@@ -5,6 +5,7 @@ export interface SchemaEntry {
   readonly tag: string;
   readonly sha256: string;
   readonly sourceUrl: string;
+  readonly syncedAt: string;
 }
 
 export interface SchemaManifest {

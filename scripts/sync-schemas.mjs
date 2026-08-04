@@ -106,21 +106,32 @@ export async function synchronizeSchemas({
   );
 
   const existing = await readExistingManifest(root);
-  const changed = CHANNELS.some((channel) => {
+  const channelChanged = Object.fromEntries(CHANNELS.map((channel) => {
     const previous = existing?.channels?.[channel];
     const next = downloaded[channel].entry;
-    return previous?.tag !== next.tag || previous?.sha256 !== next.sha256;
-  });
+    return [channel, previous?.tag !== next.tag || previous?.sha256 !== next.sha256];
+  }));
+  const metadataMissing = CHANNELS.some(
+    (channel) => typeof existing?.channels?.[channel]?.syncedAt !== "string",
+  );
+  const changed = CHANNELS.some((channel) => channelChanged[channel]) || metadataMissing;
 
   if (!changed) {
     return { changed: false, manifest: existing };
   }
 
+  const synchronizedAt = now().toISOString();
+  const entryFor = (channel) => ({
+    ...downloaded[channel].entry,
+    syncedAt: channelChanged[channel]
+      ? synchronizedAt
+      : existing?.channels?.[channel]?.syncedAt ?? existing?.generatedAt ?? synchronizedAt,
+  });
   const manifest = {
-    generatedAt: now().toISOString(),
+    generatedAt: synchronizedAt,
     channels: {
-      stable: downloaded.stable.entry,
-      alpha: downloaded.alpha.entry,
+      stable: entryFor("stable"),
+      alpha: entryFor("alpha"),
     },
   };
 

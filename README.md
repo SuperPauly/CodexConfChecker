@@ -60,6 +60,27 @@ The `Sync Codex schemas` workflow runs this check every 30 minutes. Meaningful
 schema or release metadata changes are committed to `main`, which starts the
 separate tested GitHub Pages deployment workflow.
 
+Each stable and alpha manifest entry records its own `syncedAt` timestamp. The
+website shows this as the last time that exact release schema was successfully
+copied from OpenAI and merged into this repository.
+
+## Optional visitor analytics
+
+The site supports Google Analytics 4 for visitor and page view metrics. Create a
+GA4 property and web data stream, then copy its measurement ID, such as
+`G-AB12CD34`.
+
+In this GitHub repository, open **Settings**, **Secrets and variables**,
+**Actions**, then **Variables**. Add a repository variable named
+`GA_MEASUREMENT_ID` containing that measurement ID and manually run the Pages
+workflow, or push a new commit.
+
+The measurement ID is public configuration rather than a secret. When the
+variable is absent or malformed, analytics is disabled. When it is configured,
+the Google tag is not loaded until a visitor explicitly allows analytics. Only
+standard page visit data is sent. Configuration text, uploaded filenames,
+schemas, diagnostics, validation results, and formatting results remain local.
+
 ## Deployment
 
 Every push to `main` runs linting, type checks, browser tests, workflow tests,

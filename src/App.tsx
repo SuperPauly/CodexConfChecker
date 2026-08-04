@@ -15,11 +15,12 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { TomlEditor } from "./editor/TomlEditor";
+import { AnalyticsConsent } from "./components/AnalyticsConsent";
 import { ProblemsPanel } from "./components/ProblemsPanel";
 import { documentLevelDiagnostic } from "./diagnostics/location";
 import { diagnosticCountSummary } from "./diagnostics/summary";
 import { applyRainglowTheme, loadEditorTheme, RAINGLOW_THEMES, saveEditorTheme, type RainglowThemeId } from "./editor/rainglow";
-import { parseSchemaManifest, schemaAssetUrl } from "./schema/manifest";
+import { formatSchemaSyncTime, parseSchemaManifest, schemaAssetUrl } from "./schema/manifest";
 import type { TomlEngine } from "./taplo/service";
 import type { Diagnostic } from "./taplo/types";
 import type { SchemaChannel, SchemaManifest } from "./types/schema";
@@ -231,7 +232,10 @@ export function ValidatorWorkbench({ engine, manifest, onThemeChange, themeId }:
               />
               <span>
                 <strong>{option === "stable" ? "Stable" : "Alpha"}</strong>
-                <small>{manifest.channels[option].version}</small>
+                <small className="schema-version">{manifest.channels[option].version}</small>
+                <time className="schema-sync-time" dateTime={manifest.channels[option].syncedAt}>
+                  Last synced {formatSchemaSyncTime(manifest.channels[option].syncedAt)}
+                </time>
               </span>
             </label>
           ))}
@@ -291,7 +295,7 @@ export function ValidatorWorkbench({ engine, manifest, onThemeChange, themeId }:
 
         <ProblemsPanel diagnostics={diagnostics} onVisit={visitDiagnostic} />
 
-        <p className="privacy-note">Everything runs locally in your browser. No TOML is sent to a server.</p>
+        <p className="privacy-note">Configuration processing stays in your browser. Optional anonymous visit metrics only start after consent.</p>
       </section>
     </main>
   );
@@ -313,6 +317,7 @@ export function ApplicationWorkbench({ engine, manifest }: ValidatorWorkbenchPro
       <button aria-selected={tab === "generic"} onClick={() => setTab("generic")} role="tab" type="button"><strong>JSON Schema Workbench</strong><span>JSON · YAML · TOML</span></button>
     </nav>
     {tab === "codex" ? <ValidatorWorkbench engine={engine} manifest={manifest} onThemeChange={changeTheme} themeId={themeId} /> : <main className="app-shell"><section className="tool-card"><div className="generic-topline"><h1>Config Checker</h1></div><GenericWorkbench engine={engine} onThemeChange={changeTheme} themeId={themeId} /></section></main>}
+    <AnalyticsConsent measurementId={import.meta.env.VITE_GA_MEASUREMENT_ID} />
   </div>;
 }
 
