@@ -66,7 +66,13 @@ function addSupportedFormats(ajv: AjvCore, schemas: readonly unknown[]): SchemaN
 
 function ajvFor(schema: unknown, relatedSchemas: readonly unknown[]): { ajv?: AjvCore; notices: SchemaNotice[]; unsupported?: SchemaProblem } {
   const uri = schemaObject(schema)?.$schema;
-  const options = { allErrors: true, strict: true, verbose: true, validateFormats: true } as const;
+  const options = {
+    allErrors: true,
+    strict: true,
+    strictRequired: false,
+    verbose: true,
+    validateFormats: true,
+  } as const;
   let ajv: AjvCore;
   if (uri === undefined) {
     ajv = new Ajv2020(options);

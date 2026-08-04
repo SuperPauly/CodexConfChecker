@@ -65,6 +65,26 @@ describe("validateSchemaRequest", () => {
     expect(result.problems).toEqual([]);
   });
 
+  it("compiles Codex exclusion guards without treating strictRequired lint as a schema error", () => {
+    const result = validateSchemaRequest({
+      requestId: 10,
+      value: {},
+      primary: {
+        fileName: "config-schema.json",
+        schema: {
+          $schema: "https://json-schema.org/draft/2020-12/schema",
+          type: "object",
+          allOf: [{ not: { required: ["exclude"] } }],
+        },
+      },
+      dependencies: [],
+      referenceMode: "internal",
+    });
+
+    expect(result.problems.some((problem) => problem.keyword === "schema-compile")).toBe(false);
+    expect(result.valid).toBe(true);
+  });
+
   it.each([
     ["uint", 0, -1],
     ["uint16", 65_535, 65_536],
