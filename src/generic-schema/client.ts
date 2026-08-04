@@ -1,4 +1,6 @@
-import type { SchemaValidationRequest, SchemaValidationResponse } from "./types";
+import type { SchemaPreflightRequest, SchemaValidationRequest, SchemaValidationResponse } from "./types";
+
+type WorkerRequest = SchemaValidationRequest | SchemaPreflightRequest;
 
 export class SchemaWorkerClient {
   #worker: Worker | undefined;
@@ -11,7 +13,7 @@ export class SchemaWorkerClient {
     return this.#worker;
   }
 
-  validate(request: Omit<SchemaValidationRequest, "requestId">): Promise<SchemaValidationResponse> {
+  #request(request: Omit<SchemaValidationRequest, "requestId"> | Omit<SchemaPreflightRequest, "requestId">): Promise<SchemaValidationResponse> {
     const requestId = ++this.#sequence;
     const worker = this.#createWorker();
     return new Promise((resolve) => {
@@ -40,8 +42,16 @@ export class SchemaWorkerClient {
       }, this.timeoutMs);
       worker.addEventListener("message", handleMessage);
       worker.addEventListener("error", handleError);
-      worker.postMessage({ ...request, requestId } satisfies SchemaValidationRequest);
+      worker.postMessage({ ...request, requestId } as WorkerRequest);
     });
+  }
+
+  validate(request: Omit<SchemaValidationRequest, "requestId">): Promise<SchemaValidationResponse> {
+    return this.#request({ ...request, kind: "validate" });
+  }
+
+  preflight(request: Omit<SchemaPreflightRequest, "requestId" | "kind">): Promise<SchemaValidationResponse> {
+    return this.#request({ ...request, kind: "preflight" });
   }
 
   cancel(): void {

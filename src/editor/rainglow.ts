@@ -56,6 +56,18 @@ export const RAINGLOW_THEMES = [
   palette("glowfish", "Glowfish", "dark", "#191f13", "#6ea240", "#3c4e2d", "#60a365", "#f8bb39", "#95cc5e", "#d65940", "#95cc5e", "#db784d"),
   palette("grunge", "Grunge", "dark", "#31332c", "#f8f8f2", "#5c634f", "#ffc48c", "#d1f2a5", "#f56991", "#91a374", "#d1f2a5", "#f56991"),
   palette("halflife", "Half Life", "dark", "#222222", "#cccccc", "#555555", "#f9d423", "#f9d423", "#f9d423", "#7d8991", "#fc913a", "#7d8991"),
+  palette("peacock", "Peacock", "dark", "#2b2a27", "#ede0ce", "#7a7267", "#ede0ce", "#bcd42a", "#bcd42a", "#26a6a6", "#26a6a6", "#26a6a6"),
+  palette("peacocks-in-space", "Peacocks in Space", "dark", "#2b303b", "#dee3ec", "#6e7a94", "#dee3ec", "#bcd42a", "#bcd42a", "#26a6a6", "#26a6a6", "#26a6a6"),
+  palette("rainbow", "Rainbow", "dark", "#373c42", "#c7d0d9", "#657482", "#f4f7fa", "#c78feb", "#c78feb", "#3fb4c5", "#b3cc57", "#b3cc57"),
+  palette("solarflare", "Solarflare", "dark", "#222222", "#e3e2e0", "#777777", "#e3e2e0", "#ede574", "#ff4e50", "#ff4e50", "#fc913a", "#fc913a"),
+  palette("tonic", "Tonic", "dark", "#2a2f31", "#eeeeee", "#4a5356", "#eeeeee", "#b8cd44", "#b8cd44", "#ef6e44", "#75a1a4", "#75a1a4"),
+  palette("mintchoc", "Mint Chocolate", "dark", "#2b221c", "#bababa", "#564439", "#bababa", "#00e08c", "#00e08c", "#9d8262", "#9d8262", "#9d8262"),
+  palette("heroku", "Heroku", "dark", "#1b1b24", "#c8c7d5", "#505067", "#c8c7d5", "#a6fa62", "#a6fa62", "#7873ae", "#585480", "#585480"),
+  palette("goldfish", "Goldfish", "dark", "#2e3336", "#f8f8f2", "#505c63", "#f8f8f2", "#f36e3a", "#f25619", "#a7dbd8", "#f38630", "#f38630"),
+  palette("lavender", "Lavender", "dark", "#29222e", "#e0ceed", "#614e6e", "#e0ceed", "#f5b0ef", "#f25ae6", "#8e6da6", "#a29dfa", "#a29dfa"),
+  palette("spearmint", "Spearmint", "dark", "#415654", "#c9dbd9", "#749995", "#c9dbd9", "#4cd7e0", "#199fa8", "#69adb5", "#69adb5", "#69adb5"),
+  palette("chocolate", "Chocolate", "dark", "#261b0e", "#ffffff", "#8e6239", "#ffffff", "#f7a21b", "#f7a21b", "#b99768", "#8b6e46", "#8b6e46"),
+  palette("horizon", "Horizon", "dark", "#474466", "#ffffff", "#736faa", "#dddced", "#fd8a25", "#e524a9", "#e5194b", "#fd8a25", "#fd8a25"),
   palette("absent-light", "Absent Light", "light", "#ffffff", "#465360", "#aeb9c4", "#465360", "#478e5f", "#61bcc6", "#228a96", "#228a96", "#6ba77f"),
   palette("allure-light", "Allure Light", "light", "#ffffff", "#555e68", "#b5c0cc", "#555e68", "#cec86f", "#cea36f", "#5da892", "#5da892", "#e4d294"),
   palette("azure-light", "Azure Light", "light", "#ffffff", "#444444", "#aaaaaa", "#508aaa", "#64aeb3", "#64aeb3", "#508aaa", "#6ab0a3", "#8291ad"),
@@ -89,6 +101,9 @@ export function applyRainglowTheme(
 ): RainglowTheme {
   const theme = RAINGLOW_THEMES.find((candidate) => candidate.id === themeId) ?? RAINGLOW_THEMES[0];
   const { colours } = theme;
+  const semantic = theme.variant === "dark"
+    ? { danger: "#ff8585", warning: "#f0bd55", info: "#7dbbfa" }
+    : { danger: "#b42318", warning: "#9a6700", info: "#175cd3" };
   const mix = (foreground: string, amount: number, background = colours.background) =>
     `color-mix(in srgb, ${foreground} ${amount}%, ${background})`;
   const variables: Readonly<Record<string, string>> = {
@@ -105,13 +120,13 @@ export function applyRainglowTheme(
     "--primary-text": colours.background,
     "--success": colours.string,
     "--success-bg": mix(colours.string, 16),
-    "--danger": colours.keyword,
-    "--danger-bg": mix(colours.keyword, 16),
-    "--danger-line": mix(colours.keyword, 24),
-    "--warning": colours.number,
-    "--warning-bg": mix(colours.number, 16),
-    "--info": colours.property,
-    "--info-bg": mix(colours.property, 16),
+    "--danger": semantic.danger,
+    "--danger-bg": mix(semantic.danger, theme.variant === "dark" ? 20 : 10),
+    "--danger-line": mix(semantic.danger, theme.variant === "dark" ? 28 : 15),
+    "--warning": semantic.warning,
+    "--warning-bg": mix(semantic.warning, theme.variant === "dark" ? 20 : 11),
+    "--info": semantic.info,
+    "--info-bg": mix(semantic.info, theme.variant === "dark" ? 20 : 10),
     "--editor": colours.background,
     "--editor-border": mix(colours.accent, 35),
     "--editor-text": colours.foreground,

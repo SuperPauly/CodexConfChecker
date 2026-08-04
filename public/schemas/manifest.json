@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-04T13:53:14.898Z",
+  "generatedAt": "2026-08-04T20:37:47.144Z",
   "programs": {
     "codex": {
       "name": "Codex CLI",
@@ -17,9 +17,19 @@
           "syncedAt": "2026-08-04T12:21:47.621Z"
         },
         {
+          "id": "rust-v0.147.0-alpha.6.3",
+          "label": "v0.147.0-alpha.6.3",
+          "channel": "alpha",
+          "version": "v0.147.0-alpha.6.3",
+          "sha256": "9cc18ff3c7f88481cf9ff81a353bceb2a55cfc8cf4dc8853ac60c543a75b285f",
+          "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.147.0-alpha.6.3/config-schema.json",
+          "assetPath": "schemas/codex/releases/rust-v0.147.0-alpha.6.3/config-schema.json",
+          "syncedAt": "2026-08-04T20:37:47.144Z"
+        },
+        {
           "id": "rust-v0.147.0-alpha.6.1",
           "label": "v0.147.0-alpha.6.1",
-          "channel": "alpha",
+          "channel": "archive",
           "version": "v0.147.0-alpha.6.1",
           "sha256": "9cc18ff3c7f88481cf9ff81a353bceb2a55cfc8cf4dc8853ac60c543a75b285f",
           "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.147.0-alpha.6.1/config-schema.json",
@@ -995,6 +1005,40 @@
           "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.142.0/config-schema.json",
           "assetPath": "schemas/codex/releases/rust-v0.142.0/config-schema.json",
           "syncedAt": "2026-08-04T13:53:14.898Z"
+        }
+      ]
+    },
+    "gemini": {
+      "name": "Gemini CLI",
+      "defaultFormat": "json",
+      "outputBaseName": "settings",
+      "versions": [
+        {
+          "id": "main",
+          "label": "Current main",
+          "channel": "stable",
+          "version": "main",
+          "sourceUrl": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
+          "assetPath": "schemas/gemini/main/settings.schema.json",
+          "sha256": "8bc78d59eb87aa79893a0b5928720d571397505b94e2d983f988c5932afc0016",
+          "syncedAt": "2026-08-04T20:37:47.144Z"
+        }
+      ]
+    },
+    "hermes": {
+      "name": "Hermes Agent",
+      "defaultFormat": "yaml",
+      "outputBaseName": "hermes-config",
+      "versions": [
+        {
+          "id": "0f702c2",
+          "label": "Pinned 0f702c2",
+          "channel": "stable",
+          "version": "0f702c2",
+          "sourceUrl": "https://raw.githubusercontent.com/dbydd/hermes-agent/0f702c2dd7a75e532698f5590e5ceb80e747e41e/website/static/schemas/hermes-config.schema.json",
+          "assetPath": "schemas/hermes/0f702c2/hermes-config.schema.json",
+          "sha256": "fa638fa40eb7aabaf16cb1f97a3618350e2817e6ac934d61d22435f5a0401f94",
+          "syncedAt": "2026-08-04T20:37:47.144Z"
         }
       ]
     }

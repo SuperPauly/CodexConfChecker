@@ -92,7 +92,7 @@ function lintJson(source: string, parsed: ParsedDocument, settings: LintSettings
       const order = String(setting(settings, "json/key-ordering").options.order);
       const sorted = [...keys].sort((a, b) => a.localeCompare(b));
       if (order === "descending") sorted.reverse();
-      if (keys.some((key, index) => key !== sorted[index])) emit("json/key-ordering", pathRange(path), { message: `JSON properties at '${path || "/"}' are not in ${order} order.`, explanation: "The active lint setting requires deterministic alphabetical property ordering.", suggestion: `Reorder properties as: ${sorted.join(", ")}.`, actual: keys.join(", "), expected: sorted.join(", "), dataPath: path });
+      if (keys.some((key, index) => key !== sorted[index])) emit("json/key-ordering", pathRange(path), { message: "Properties are not in alphabetical order.", explanation: `The active lint setting requires ${order} alphabetical property ordering at '${path || "/"}'.`, suggestion: `Reorder the properties in ${order} alphabetical order.`, actual: keys.join(", "), expected: sorted.join(", "), dataPath: path });
     }
   });
 }
@@ -151,7 +151,7 @@ function lintYaml(source: string, parsed: ParsedDocument, settings: LintSettings
     const keys = Object.keys(value);
     const sorted = [...keys].sort((a, b) => a.localeCompare(b));
     if (order === "descending") sorted.reverse();
-    if (keys.some((key, index) => key !== sorted[index])) emit("yaml/key-ordering", parsed.locations.get(path) ?? rangeFromOffsets(source, 0, 0), { message: `YAML keys at '${path || "/"}' are not in ${order} order.`, explanation: "The active lint setting requires deterministic alphabetical key ordering.", suggestion: `Reorder keys as: ${sorted.join(", ")}.`, actual: keys.join(", "), expected: sorted.join(", "), dataPath: path });
+    if (keys.some((key, index) => key !== sorted[index])) emit("yaml/key-ordering", parsed.locations.get(path) ?? rangeFromOffsets(source, 0, 0), { message: "Keys are not in alphabetical order.", explanation: `The active lint setting requires ${order} alphabetical key ordering at '${path || "/"}'.`, suggestion: `Reorder the keys in ${order} alphabetical order.`, actual: keys.join(", "), expected: sorted.join(", "), dataPath: path });
   });
   const quoteStyle = String(setting(settings, "yaml/quoted-strings").options.style);
   for (const match of source.matchAll(/:\s*(["'])(.*?)\1\s*(?:#.*)?$/gm)) {
@@ -176,7 +176,7 @@ function lintToml(source: string, parsed: ParsedDocument, settings: LintSettings
   if (order === "descending") sorted.reverse();
   const firstWrong = names.findIndex((name, index) => name !== sorted[index]);
   const wrongTable = tables[firstWrong];
-  if (wrongTable) emit("toml/table-ordering", lineRange(wrongTable.line), { message: `TOML table '${wrongTable.name}' is out of ${order} order.`, explanation: "The active lint setting requires deterministic alphabetical table ordering.", suggestion: `Order tables as: ${sorted.join(", ")}.`, actual: names.join(", "), expected: sorted.join(", ") });
+  if (wrongTable) emit("toml/table-ordering", lineRange(wrongTable.line), { message: "Tables are not in alphabetical order.", explanation: `The active lint setting requires ${order} alphabetical table ordering.`, suggestion: `Reorder the tables in ${order} alphabetical order.`, actual: names.join(", "), expected: sorted.join(", ") });
   if (parsed.value !== undefined) walkValue(parsed.value, (value, path) => {
     if (!Array.isArray(value) || value.length < 2) return;
     const types = [...new Set(value.map(valueType))];

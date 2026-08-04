@@ -7,6 +7,8 @@ import { normalizeVersion } from "./release-selection.mjs";
 
 const RELEASES_URL = "https://api.github.com/repos/openai/codex/releases?per_page=100";
 const STABLE_SCHEMA_URL = "https://learn.chatgpt.com/docs/config-schema.json";
+export const GEMINI_SCHEMA_URL = "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json";
+export const HERMES_SCHEMA_URL = "https://raw.githubusercontent.com/dbydd/hermes-agent/0f702c2dd7a75e532698f5590e5ceb80e747e41e/website/static/schemas/hermes-config.schema.json";
 const RELEASE_TAG = /^rust-v\d+\.\d+\.\d+(?:-alpha(?:\.\d+)*)?$/u;
 const ALPHA_TAG = /-alpha(?:\.|$)/u;
 const ASSET_NAME = "config-schema.json";
@@ -66,6 +68,12 @@ function existingVersions(manifest) {
   return Array.isArray(versions) ? versions : [];
 }
 
+function synchronizedEntry(previous, entry, text, synchronizedAt) {
+  const hash = sha256(text);
+  const old = previous?.programs?.[entry.programId]?.versions?.find((version) => version.id === entry.id);
+  return { value: { ...entry, sha256: hash, syncedAt: old?.sha256 === hash ? old.syncedAt : synchronizedAt }, changed: old?.sha256 !== hash };
+}
+
 function releaseEntry(item, synchronizedAt, latestAlpha) {
   const tag = item.release.tag_name;
   const alpha = ALPHA_TAG.test(tag);
@@ -87,16 +95,28 @@ export async function synchronizeSchemas({ root, fetchImpl = globalThis.fetch, n
   const previous = existingVersions(existing);
   const previousById = new Map(previous.map((entry) => [entry.id, entry]));
 
-  const [stableRaw, releasesRaw] = await Promise.all([
+  const [stableRaw, releasesRaw, geminiRaw, hermesRaw] = await Promise.all([
     fetchText(fetchImpl, STABLE_SCHEMA_URL),
     fetchText(fetchImpl, RELEASES_URL),
+    fetchText(fetchImpl, GEMINI_SCHEMA_URL),
+    fetchText(fetchImpl, HERMES_SCHEMA_URL),
   ]);
   const stableText = normalizeSchema(stableRaw, "stable schema");
+  const geminiText = normalizeSchema(geminiRaw, "Gemini schema");
+  const hermesText = normalizeSchema(hermesRaw, "Hermes schema");
   const releaseItems = schemaReleases(parseJson(releasesRaw, "GitHub releases response"));
   const latestAlphaItem = releaseItems.find((item) => ALPHA_TAG.test(item.release.tag_name));
   if (!latestAlphaItem) throw new Error(`No Codex alpha release with a ${ASSET_NAME} asset was found`);
 
   const synchronizedAt = now().toISOString();
+  const gemini = synchronizedEntry(existing, {
+    programId: "gemini", id: "main", label: "Current main", channel: "stable", version: "main",
+    sourceUrl: GEMINI_SCHEMA_URL, assetPath: "schemas/gemini/main/settings.schema.json",
+  }, geminiText, synchronizedAt);
+  const hermes = synchronizedEntry(existing, {
+    programId: "hermes", id: "0f702c2", label: "Pinned 0f702c2", channel: "stable", version: "0f702c2",
+    sourceUrl: HERMES_SCHEMA_URL, assetPath: "schemas/hermes/0f702c2/hermes-config.schema.json",
+  }, hermesText, synchronizedAt);
   const downloaded = await Promise.all(releaseItems.map(async (item) => {
     const old = previousById.get(item.release.tag_name);
     if (old) {
@@ -127,15 +147,25 @@ export async function synchronizeSchemas({ root, fetchImpl = globalThis.fetch, n
     .filter((entry) => entry.id !== "stable-current" && !currentIds.has(entry.id))
     .map((entry) => ({ ...entry, channel: "archive" }));
   const versions = [stable, ...currentReleaseVersions, ...retainedVersions];
+  const geminiVersion = { ...gemini.value };
+  const hermesVersion = { ...hermes.value };
+  delete geminiVersion.programId;
+  delete hermesVersion.programId;
   const manifest = {
     generatedAt: synchronizedAt,
-    programs: { codex: { name: "Codex CLI", defaultFormat: "toml", outputBaseName: "config", versions } },
+    programs: {
+      codex: { name: "Codex CLI", defaultFormat: "toml", outputBaseName: "config", versions },
+      gemini: { name: "Gemini CLI", defaultFormat: "json", outputBaseName: "settings", versions: [geminiVersion] },
+      hermes: { name: "Hermes Agent", defaultFormat: "yaml", outputBaseName: "hermes-config", versions: [hermesVersion] },
+    },
   };
   const previousComparable = existing ? JSON.stringify({ ...existing, generatedAt: synchronizedAt }) : "";
   const changed = previousComparable !== JSON.stringify(manifest);
   if (!changed) return { changed: false, manifest: existing };
 
   if (stableChanged) await writeAtomic(path.join(root, "codex/stable-current/config-schema.json"), stableText);
+  if (gemini.changed) await writeAtomic(path.join(root, "gemini/main/settings.schema.json"), geminiText);
+  if (hermes.changed) await writeAtomic(path.join(root, "hermes/0f702c2/hermes-config.schema.json"), hermesText);
   await Promise.all(downloaded.filter((item) => item.text).map((item) => writeAtomic(path.join(root, `codex/releases/${item.release.tag_name}/config-schema.json`), item.text)));
   await writeAtomic(path.join(root, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   return { changed: true, manifest };
@@ -146,6 +176,6 @@ if (isMain) {
   const root = path.resolve("public/schemas");
   await mkdir(root, { recursive: true });
   const result = await synchronizeSchemas({ root });
-  console.log(`Codex schemas are ${result.changed ? "updated" : "already current"}.`);
+  console.log(`Schema registry is ${result.changed ? "updated" : "already current"}.`);
   await access(path.join(root, "manifest.json"));
 }

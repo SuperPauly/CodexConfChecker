@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 
-import { ApplicationWorkbench } from "./App";
+import { ApplicationWorkbench, DEFAULT_GA_MEASUREMENT_ID } from "./App";
 import type { TomlEngine } from "./taplo/service";
 import type { SchemaManifest } from "./types/schema";
 
@@ -28,11 +28,16 @@ const engine: TomlEngine = {
 };
 
 describe("ApplicationWorkbench", () => {
+  it("uses the requested Google Analytics property by default", () => {
+    expect(DEFAULT_GA_MEASUREMENT_ID).toBe("G-CET6VNKSBL");
+  });
+
   it("renders one unified workbench without validator mode tabs", () => {
     render(<ApplicationWorkbench engine={engine} manifest={manifest} />);
-    expect(screen.getByRole("heading", { name: "Config Schema Workbench" })).toBeVisible();
-    expect(screen.getByLabelText(/program/i)).toHaveValue("codex");
-    expect(screen.getByRole("button", { name: /select version/i })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Check your config" })).toBeVisible();
+    expect(screen.getByLabelText(/schema source/i)).toHaveValue("none");
+    expect(screen.queryByLabelText(/^program$/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /select version/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
   });
 });

@@ -13,13 +13,15 @@ export interface ValidatorWorkbenchProps {
   readonly manifest: SchemaManifest;
 }
 
+export const DEFAULT_GA_MEASUREMENT_ID = "G-CET6VNKSBL";
+
 export function ApplicationWorkbench({ engine, manifest }: ValidatorWorkbenchProps) {
   const [themeId, setThemeId] = useState<RainglowThemeId>(() => loadEditorTheme());
   const changeTheme = (next: RainglowThemeId) => { setThemeId(next); saveEditorTheme(next); };
   useEffect(() => { applyRainglowTheme(themeId); }, [themeId]);
   return <div className="application-shell">
     <main className="app-shell"><section className="tool-card"><GenericWorkbench engine={engine} manifest={manifest} onThemeChange={changeTheme} themeId={themeId} /></section></main>
-    <AnalyticsConsent measurementId={import.meta.env.VITE_GA_MEASUREMENT_ID} />
+    <AnalyticsConsent measurementId={import.meta.env.VITE_GA_MEASUREMENT_ID?.trim() || DEFAULT_GA_MEASUREMENT_ID} />
   </div>;
 }
 

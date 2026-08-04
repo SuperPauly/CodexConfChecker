@@ -45,4 +45,15 @@ describe("ConfigEditor", () => {
     );
     expect(screen.getByRole("textbox", { name: "JSON configuration editor" })).toBeInTheDocument();
   });
+
+  it("keeps the same CodeMirror DOM while the value and diagnostics change", () => {
+    const props = { language: "json" as const, onChange: vi.fn(), onCreateEditor: vi.fn(), onValidationTrigger: vi.fn(), themeId: "azure" as const };
+    const { container, rerender } = render(<ConfigEditor {...props} diagnostics={[]} value="{}" />);
+    const editor = container.querySelector(".cm-editor");
+    const content = container.querySelector(".cm-content");
+    rerender(<ConfigEditor {...props} diagnostics={[{ from: 0, to: 1, line: 1, column: 1, endLine: 1, endColumn: 2, severity: "error", source: "schema", ruleId: "schema/type", message: "Wrong type.", explanation: "A string is required." }]} value={'{"value":1}'} />);
+    expect(container.querySelector(".cm-editor")).toBe(editor);
+    expect(container.querySelector(".cm-content")).toBe(content);
+    expect(container.querySelector(".cm-error-line")).toBeInTheDocument();
+  });
 });

@@ -6,7 +6,7 @@ import AjvDraft04 from "ajv-draft-04";
 import addFormats from "ajv-formats";
 
 import { prepareSchemas, scanReferences } from "./references";
-import type { SchemaNotice, SchemaProblem, SchemaValidationRequest, SchemaValidationResponse } from "./types";
+import type { SchemaNotice, SchemaPreflightRequest, SchemaProblem, SchemaValidationRequest, SchemaValidationResponse } from "./types";
 
 type JsonObject = Record<string, unknown>;
 
@@ -59,8 +59,8 @@ function addSupportedFormats(ajv: AjvCore, schemas: readonly unknown[]): SchemaN
   return custom.length ? [{
     ruleId: "schema/format-annotation",
     severity: "info",
-    message: `Custom JSON Schema ${custom.length === 1 ? "format" : "formats"} treated as annotation: ${custom.join(", ")}.`,
-    explanation: "Structural validation still ran, but this validator does not assert application-specific format semantics.",
+    message: `${custom.length} custom schema ${custom.length === 1 ? "format is" : "formats are"} treated as annotations.`,
+    explanation: `Structural validation still ran, but application-specific format semantics were not asserted: ${custom.join(", ")}.`,
   }] : [];
 }
 
@@ -107,7 +107,9 @@ function normalizeDraft04Identifier(schema: unknown): unknown {
   return { ...rest, id: $id };
 }
 
-export function validateSchemaRequest(request: SchemaValidationRequest): SchemaValidationResponse {
+type CompileRequest = SchemaValidationRequest | SchemaPreflightRequest;
+
+function compileSchemaRequest(request: CompileRequest) {
   const notices: SchemaNotice[] = [];
   try {
     const referenceIssues = scanReferences(request.primary.schema, request.referenceMode, request.dependencies);
@@ -126,8 +128,7 @@ export function validateSchemaRequest(request: SchemaValidationRequest): SchemaV
     const primary = (draft04 ? normalizeDraft04Identifier(prepared.primary) : prepared.primary) as AnySchema;
     if (!ajv.validateSchema(primary)) return { requestId: request.requestId, valid: false, notices, problems: serializeErrors(ajv.errors).map((problem) => ({ ...problem, keyword: "schema-invalid", message: `Uploaded JSON Schema is invalid: ${problem.message}` })) };
     const validate = ajv.compile(primary);
-    const valid = validate(request.value);
-    return { requestId: request.requestId, valid: Boolean(valid), notices, problems: serializeErrors(validate.errors) };
+    return { requestId: request.requestId, valid: true, notices, problems: [], validate };
   } catch (error) {
     return {
       requestId: request.requestId,
@@ -144,8 +145,35 @@ export function validateSchemaRequest(request: SchemaValidationRequest): SchemaV
   }
 }
 
+function responseFromCompilation(compiled: ReturnType<typeof compileSchemaRequest>): SchemaValidationResponse {
+  return {
+    requestId: compiled.requestId,
+    valid: compiled.valid,
+    notices: compiled.notices,
+    problems: compiled.problems,
+  };
+}
+
+export function preflightSchemaRequest(request: SchemaPreflightRequest): SchemaValidationResponse {
+  return responseFromCompilation(compileSchemaRequest(request));
+}
+
+export function validateSchemaRequest(request: SchemaValidationRequest): SchemaValidationResponse {
+  const compiled = compileSchemaRequest(request);
+  if (!compiled.valid || !compiled.validate) {
+    return responseFromCompilation(compiled);
+  }
+  const valid = compiled.validate(request.value);
+  return {
+    requestId: request.requestId,
+    valid: Boolean(valid),
+    notices: compiled.notices,
+    problems: serializeErrors(compiled.validate.errors),
+  };
+}
+
 if (typeof document === "undefined" && typeof globalThis.addEventListener === "function") {
-  globalThis.addEventListener("message", (event: MessageEvent<SchemaValidationRequest>) => {
-    globalThis.postMessage(validateSchemaRequest(event.data));
+  globalThis.addEventListener("message", (event: MessageEvent<SchemaValidationRequest | SchemaPreflightRequest>) => {
+    globalThis.postMessage(event.data.kind === "preflight" ? preflightSchemaRequest(event.data) : validateSchemaRequest(event.data));
   });
 }

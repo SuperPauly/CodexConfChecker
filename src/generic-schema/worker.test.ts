@@ -1,6 +1,34 @@
 import { describe, expect, it } from "vitest";
 
-import { validateSchemaRequest } from "./worker";
+import { preflightSchemaRequest, validateSchemaRequest } from "./worker";
+
+describe("preflightSchemaRequest", () => {
+  it("accepts a genuine JSON Schema without validating it against config data", () => {
+    const result = preflightSchemaRequest({
+      kind: "preflight",
+      requestId: 100,
+      primary: { fileName: "schema.json", schema: { type: "object", required: ["name"] } },
+      dependencies: [],
+      referenceMode: "internal",
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.problems).toEqual([]);
+  });
+
+  it("rejects JSON that is not a valid JSON Schema", () => {
+    const result = preflightSchemaRequest({
+      kind: "preflight",
+      requestId: 101,
+      primary: { fileName: "schema.json", schema: { type: 42 } },
+      dependencies: [],
+      referenceMode: "internal",
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.problems[0]?.message).toMatch(/schema.*invalid|type/i);
+  });
+});
 
 describe("validateSchemaRequest", () => {
   it.each([
@@ -132,7 +160,8 @@ describe("validateSchemaRequest", () => {
     expect(result.notices).toContainEqual(expect.objectContaining({
       ruleId: "schema/format-annotation",
       severity: "info",
-      message: expect.stringContaining("project-slug"),
+      message: expect.stringContaining("1 custom schema format"),
+      explanation: expect.stringContaining("project-slug"),
     }));
   });
 });

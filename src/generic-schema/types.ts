@@ -30,8 +30,17 @@ export interface SchemaNotice {
 }
 
 export interface SchemaValidationRequest {
+  readonly kind?: "validate";
   readonly requestId: number;
   readonly value: unknown;
+  readonly primary: LocalSchemaFile;
+  readonly dependencies: readonly LocalSchemaFile[];
+  readonly referenceMode: ReferenceMode;
+}
+
+export interface SchemaPreflightRequest {
+  readonly kind: "preflight";
+  readonly requestId: number;
   readonly primary: LocalSchemaFile;
   readonly dependencies: readonly LocalSchemaFile[];
   readonly referenceMode: ReferenceMode;
