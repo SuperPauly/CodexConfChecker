@@ -4,13 +4,15 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { sha256, synchronizeSchemas } from "./sync-schemas.mjs";
+import { GEMINI_SCHEMA_URL, HERMES_SCHEMA_URL, sha256, synchronizeSchemas } from "./sync-schemas.mjs";
 
 const stableSchema = JSON.stringify({ type: "object", title: "stable" });
 const alphaSix = JSON.stringify({ type: "object", title: "alpha six" });
 const alphaSeven = JSON.stringify({ type: "object", title: "alpha seven" });
 const stableUrl = "https://learn.chatgpt.com/docs/config-schema.json";
 const assetUrl = "https://downloads.example/config-schema.json";
+const geminiSchema = JSON.stringify({ $schema: "https://json-schema.org/draft/2020-12/schema", title: "Gemini" });
+const hermesSchema = JSON.stringify({ $schema: "https://json-schema.org/draft/2020-12/schema", title: "Hermes" });
 
 function response(body, status = 200) { return new Response(body, { status }); }
 
@@ -32,6 +34,8 @@ function fetcher(schema = alphaSeven, releaseList = releases()) {
     if (value.includes("/releases?")) return response(JSON.stringify(releaseList));
     if (value === stableUrl) return response(stableSchema);
     if (value === assetUrl) return response(schema);
+    if (value === GEMINI_SCHEMA_URL) return response(geminiSchema);
+    if (value === HERMES_SCHEMA_URL) return response(hermesSchema);
     return response("not found", 404);
   };
 }
@@ -54,6 +58,10 @@ test("gets current stable from ChatGPT docs and alpha from the exact release ass
   assert.equal(result.manifest.programs.codex.versions[0].id, "stable-current");
   assert.equal(result.manifest.programs.codex.versions[1].version, "v0.147.0-alpha.7");
   assert.equal(result.manifest.programs.codex.versions[0].sha256, sha256(`${stableSchema}\n`));
+  assert.equal(result.manifest.programs.gemini.versions[0].version, "main");
+  assert.equal(result.manifest.programs.hermes.versions[0].version, "0f702c2");
+  assert.equal(await readFile(path.join(root, "gemini/main/settings.schema.json"), "utf8"), `${geminiSchema}\n`);
+  assert.equal(await readFile(path.join(root, "hermes/0f702c2/hermes-config.schema.json"), "utf8"), `${hermesSchema}\n`);
 });
 
 test("retains older alpha versions when a newer release appears", async () => {

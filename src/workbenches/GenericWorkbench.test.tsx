@@ -8,7 +8,7 @@ import { GenericWorkbench } from "./GenericWorkbench";
 
 vi.mock("@uiw/react-codemirror", async () => {
   const React = await import("react");
-  return { default: ({ value, onChange, onBlur, "aria-label": label }: Record<string, unknown>) => React.createElement("textarea", { "aria-label": label, value, onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => (onChange as (value: string) => void)(event.target.value), onBlur }) };
+  return { default: ({ value, onChange, onBlur, "data-editor-label": label }: Record<string, unknown>) => React.createElement("textarea", { "aria-label": label, value, onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => (onChange as (value: string) => void)(event.target.value), onBlur }) };
 });
 
 const engine: TomlEngine = {
@@ -35,10 +35,10 @@ describe("GenericWorkbench", () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
-  it("selects JSON, YAML, TOML, or automatic detection and offers all 20 themes", async () => {
+  it("selects JSON, YAML, TOML, or automatic detection and offers all themes", async () => {
     render(<GenericWorkbench engine={engine} manifest={manifest} />);
     expect(screen.getByLabelText(/configuration format/i)).toHaveValue("toml");
-    expect(screen.getByLabelText(/website theme/i).querySelectorAll("option")).toHaveLength(20);
+    expect(screen.getByLabelText(/website theme/i).querySelectorAll("option")).toHaveLength(32);
     await userEvent.selectOptions(screen.getByLabelText(/configuration format/i), "yaml");
     expect(screen.getByRole("textbox", { name: /yaml configuration editor/i })).toBeVisible();
   });
@@ -48,9 +48,11 @@ describe("GenericWorkbench", () => {
     await userEvent.selectOptions(screen.getByLabelText(/configuration format/i), "json");
     const editor = screen.getByRole("textbox", { name: /json configuration editor/i });
     fireEvent.change(editor, { target: { value: '{"port":"443"}' } });
-    await userEvent.upload(screen.getByLabelText(/upload json schema/i), new File([JSON.stringify({ $schema: "https://json-schema.org/draft/2020-12/schema", type: "object", properties: { port: { type: "integer" } } })], "config.schema.json", { type: "application/json" }));
+    await userEvent.upload(screen.getByLabelText(/choose json schema file/i), new File([JSON.stringify({ $schema: "https://json-schema.org/draft/2020-12/schema", type: "object", properties: { port: { type: "integer" } } })], "config.schema.json", { type: "application/json" }));
     await userEvent.click(screen.getByRole("button", { name: /^validate$/i }));
-    expect(await screen.findByText(/wrong value type.*expected integer/i)).toBeVisible();
+    const problem = await screen.findByText(/wrong value type.*expected integer/i);
+    expect(problem).toBeVisible();
+    await userEvent.click(problem);
     expect(screen.getByText(/replace the value with a valid integer/i)).toBeVisible();
   });
 
@@ -64,38 +66,39 @@ describe("GenericWorkbench", () => {
 
   it("supports uploaded local reference bundles and blocks them in internal mode", async () => {
     render(<GenericWorkbench engine={engine} manifest={manifest} />);
-    await userEvent.upload(screen.getByLabelText(/upload json schema/i), new File([JSON.stringify({ $ref: "port.schema.json" })], "root.schema.json", { type: "application/json" }));
-    await userEvent.upload(screen.getByLabelText(/upload schema dependencies/i), new File([JSON.stringify({ type: "object" })], "port.schema.json", { type: "application/json" }));
-    await userEvent.click(screen.getByRole("button", { name: /^validate$/i }));
+    await userEvent.upload(screen.getByLabelText(/choose json schema file/i), new File([JSON.stringify({ $ref: "port.schema.json" })], "root.schema.json", { type: "application/json" }));
     expect(await screen.findByText(/blocked in internal only mode/i)).toBeVisible();
-    fireEvent.click(screen.getByRole("radio", { name: /uploaded local bundle/i }));
+    await userEvent.click(screen.getByText(/^advanced$/i));
+    await userEvent.upload(screen.getByLabelText(/upload schema dependencies/i), new File([JSON.stringify({ type: "object" })], "port.schema.json", { type: "application/json" }));
+    fireEvent.click(screen.getByRole("radio", { name: /uploaded bundle/i }));
+    await userEvent.upload(screen.getByLabelText(/choose json schema file/i), new File([JSON.stringify({ $ref: "port.schema.json" })], "root.schema.json", { type: "application/json" }));
     await userEvent.click(screen.getByRole("button", { name: /^validate$/i }));
     await waitFor(() => expect(screen.queryByText(/blocked in internal only mode/i)).not.toBeInTheDocument());
   });
 
-  it("opens a searchable version modal and loads the chosen archived schema", async () => {
+  it("selects a program and version inline", async () => {
     render(<GenericWorkbench engine={engine} manifest={manifest} />);
-    await userEvent.click(screen.getByRole("button", { name: /select version/i }));
-    expect(screen.getByRole("dialog", { name: /select codex cli schema version/i })).toBeVisible();
-    expect(screen.getByRole("button", { name: /latest stable/i })).toBeVisible();
-    expect(screen.getByRole("button", { name: /latest alpha/i })).toBeVisible();
-    await userEvent.type(screen.getByLabelText(/search versions/i), "alpha.6");
-    await userEvent.click(screen.getByRole("radio", { name: /v0\.147\.0-alpha\.6/i }));
-    await userEvent.click(screen.getByRole("button", { name: /^load$/i }));
-    expect(screen.getByText("v0.147.0-alpha.6", { selector: ".active-schema strong" })).toBeVisible();
+    await userEvent.selectOptions(screen.getByLabelText(/schema source/i), "codex");
+    await screen.findByText(/current stable loaded/i);
+    await userEvent.click(screen.getByRole("button", { name: /change/i }));
+    await userEvent.selectOptions(screen.getByLabelText(/schema version/i), "rust-v0.147.0-alpha.6");
+    expect(await screen.findByText(/v0\.147\.0-alpha\.6 loaded/i)).toBeVisible();
   });
 
-  it("disables tracked version selection while a custom schema is uploaded", async () => {
+  it("preserves the active schema when a replacement is invalid", async () => {
     render(<GenericWorkbench engine={engine} manifest={manifest} />);
-    await userEvent.upload(screen.getByLabelText(/upload json schema/i), new File([JSON.stringify({ type: "object" })], "mine.schema.json", { type: "application/json" }));
-    expect(screen.getByRole("button", { name: /select version/i })).toBeDisabled();
-    expect(screen.getByText("mine.schema.json", { selector: ".active-schema strong" })).toBeVisible();
-    await userEvent.click(screen.getByRole("button", { name: /remove custom schema/i }));
-    expect(screen.getByRole("button", { name: /select version/i })).toBeEnabled();
+    await userEvent.upload(screen.getByLabelText(/choose json schema file/i), new File([JSON.stringify({ type: "object" })], "mine.schema.json", { type: "application/json" }));
+    expect(await screen.findByText("mine.schema.json")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: /change/i }));
+    await userEvent.upload(screen.getByLabelText(/choose json schema file/i), new File([JSON.stringify({ type: 42 })], "bad.schema.json", { type: "application/json" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/invalid|type/i);
+    await userEvent.click(screen.getByRole("button", { name: /close schema loader/i }));
+    expect(screen.getByText("mine.schema.json")).toBeVisible();
   });
 
   it("enables converted downloads only after the current revision validates", async () => {
     render(<GenericWorkbench engine={engine} manifest={manifest} />);
+    await userEvent.upload(screen.getByLabelText(/choose json schema file/i), new File([JSON.stringify({ type: "object" })], "config.schema.json", { type: "application/json" }));
     await userEvent.click(screen.getByRole("button", { name: /^download$/i }));
     expect(screen.getByRole("menuitem", { name: /json/i })).toBeDisabled();
     await userEvent.click(screen.getByRole("button", { name: /^validate$/i }));
@@ -118,6 +121,8 @@ describe("GenericWorkbench", () => {
     };
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(codexSchema), { status: 200 })));
     render(<GenericWorkbench engine={engine} manifest={manifest} />);
+    await userEvent.selectOptions(screen.getByLabelText(/schema source/i), "codex");
+    await screen.findByText(/current stable loaded/i);
     const editor = screen.getByRole("textbox", { name: /toml configuration editor/i });
     fireEvent.change(editor, { target: { value: "[agents]\nmax_threads = 8\n" } });
     await userEvent.click(screen.getByRole("button", { name: /^validate$/i }));
@@ -126,5 +131,44 @@ describe("GenericWorkbench", () => {
     await userEvent.click(screen.getByRole("button", { name: /update key/i }));
     expect(editor).toHaveValue("[agents]\nmax_concurrent_threads_per_session = 8\n");
     await waitFor(() => expect(screen.queryByText(/not declared by the selected schema/i)).not.toBeInTheDocument());
+  });
+
+  it("reveals only the selected custom schema input and rejects non-json URLs", async () => {
+    const fetchMock = vi.mocked(fetch);
+    render(<GenericWorkbench engine={engine} manifest={manifest} />);
+    expect(screen.queryByLabelText(/^json schema$/i)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /paste json/i }));
+    expect(screen.getByLabelText(/^json schema$/i)).toBeVisible();
+    expect(screen.queryByLabelText(/https .json url/i)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /fetch url/i }));
+    await userEvent.type(screen.getByLabelText(/https .json url/i), "https://example.test/schema.txt");
+    await userEvent.click(screen.getByRole("button", { name: /fetch schema/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/ends in .json/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts a dropped schema file and a clipboard-pasted schema file", async () => {
+    const { container, unmount } = render(<GenericWorkbench engine={engine} manifest={manifest} />);
+    const dropZone = container.querySelector(".schema-loader");
+    const dropped = new File([JSON.stringify({ type: "object" })], "dropped.schema.json", { type: "application/json" });
+    fireEvent.drop(dropZone!, { dataTransfer: { files: [dropped], types: ["Files"] } });
+    expect(await screen.findByText("dropped.schema.json")).toBeVisible();
+    unmount();
+
+    const second = render(<GenericWorkbench engine={engine} manifest={manifest} />);
+    const pasted = new File([JSON.stringify({ type: "object" })], "pasted.schema.json", { type: "application/json" });
+    fireEvent.paste(second.container.querySelector(".schema-loader")!, { clipboardData: { files: [pasted] } });
+    expect(await screen.findByText("pasted.schema.json")).toBeVisible();
+  });
+
+  it("opens and closes the full-screen editor without replacing its value", async () => {
+    render(<GenericWorkbench engine={engine} manifest={manifest} />);
+    const editor = screen.getByRole("textbox", { name: /toml configuration editor/i });
+    fireEvent.change(editor, { target: { value: "port = 8443\n" } });
+    await userEvent.click(screen.getByRole("button", { name: /expand editor/i }));
+    expect(editor.closest(".editor-shell")).toHaveClass("is-expanded");
+    expect(editor).toHaveValue("port = 8443\n");
+    await userEvent.keyboard("{Escape}");
+    expect(editor.closest(".editor-shell")).not.toHaveClass("is-expanded");
   });
 });

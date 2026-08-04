@@ -13,26 +13,24 @@ export interface ProblemsPanelProps {
 const icons = { error: CircleAlert, warning: TriangleAlert, info: Info };
 const severityLabels = { error: "Errors", warning: "Warnings", info: "Information" } as const;
 const severityOrder = ["error", "warning", "info"] as const;
+const VISIBLE_TEXT_LIMIT = 180;
+
+function concise(value: string | undefined, fallback = "Review this value."): string {
+  const text = (value || fallback).replace(/\s+/g, " ").trim();
+  return text.length <= VISIBLE_TEXT_LIMIT ? text : `${text.slice(0, VISIBLE_TEXT_LIMIT - 1).trimEnd()}…`;
+}
 
 function ProblemItem({ diagnostic, index, onFix, onVisit }: { readonly diagnostic: Diagnostic; readonly index: number; readonly onFix?: (diagnostic: Diagnostic) => void; readonly onVisit: (diagnostic: Diagnostic) => void }) {
   const Icon = icons[diagnostic.severity];
   return <li className={`problem-item problem-${diagnostic.severity}${diagnostic.kind ? ` problem-kind-${diagnostic.kind}` : ""}`} key={`${diagnostic.ruleId}-${diagnostic.from}-${index}`}>
-    <div className="problem-summary">
-      <Icon aria-hidden="true" size={18} />
-      <div><strong>{diagnostic.message}</strong><small>{diagnostic.source} · {diagnostic.ruleId}</small></div>
-      {diagnostic.hasSourceLocation === false ? <span className="schema-level-label">Schema level</span> : <button aria-label={`Go to line ${diagnostic.line}, column ${diagnostic.column}`} onClick={() => onVisit(diagnostic)} title="Go to highlighted source" type="button">Ln {diagnostic.line}:{diagnostic.column}<ChevronRight aria-hidden="true" size={15} /></button>}
-    </div>
-    <div className="problem-detail">
-      <p><b>Why:</b> {diagnostic.explanation}</p>
-      {diagnostic.suggestion ? <p><b>Fix:</b> {diagnostic.suggestion}</p> : null}
-      <div className="problem-metadata">
-        {diagnostic.expected ? <code>Expected: {diagnostic.expected}</code> : null}
-        {diagnostic.actual ? <code>Actual: {diagnostic.actual}</code> : null}
-        {diagnostic.dataPath !== undefined ? <code>Data path: {diagnostic.dataPath || "/"}</code> : null}
-        {diagnostic.schemaPath ? <code>Schema path: {diagnostic.schemaPath}</code> : null}
+    <details className="problem-disclosure">
+      <summary className="problem-summary"><Icon aria-hidden="true" size={18} /><strong>{concise(diagnostic.message)}</strong><ChevronRight aria-hidden="true" className="problem-chevron" size={17} /></summary>
+      <div className="problem-detail">
+        {diagnostic.suggestion ? <p><b>Fix:</b> {concise(diagnostic.suggestion)}</p> : null}
+        <div className="problem-actions">{diagnostic.hasSourceLocation === false ? <span className="schema-level-label">Schema level</span> : <button onClick={() => onVisit(diagnostic)} type="button">Go to line {diagnostic.line}:{diagnostic.column}</button>}{diagnostic.fix && onFix ? <button className="diagnostic-fix" onClick={() => onFix(diagnostic)} type="button">{diagnostic.fix.label}</button> : null}</div>
+        <details className="technical-details"><summary>Technical details</summary><p><b>Why:</b> {diagnostic.explanation}</p>{diagnostic.message.length > VISIBLE_TEXT_LIMIT ? <p><b>Full problem:</b> {diagnostic.message}</p> : null}<div className="problem-metadata"><code>Source: {diagnostic.source}</code><code>Rule: {diagnostic.ruleId}</code>{diagnostic.expected ? <code>Expected: {diagnostic.expected}</code> : null}{diagnostic.actual ? <code>Actual: {diagnostic.actual}</code> : null}{diagnostic.dataPath !== undefined ? <code>Data path: {diagnostic.dataPath || "/"}</code> : null}{diagnostic.schemaPath ? <code>Schema path: {diagnostic.schemaPath}</code> : null}</div></details>
       </div>
-      {diagnostic.fix && onFix ? <button className="diagnostic-fix" onClick={() => onFix(diagnostic)} type="button">{diagnostic.fix.label}</button> : null}
-    </div>
+    </details>
   </li>;
 }
 

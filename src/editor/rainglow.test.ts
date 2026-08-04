@@ -12,10 +12,11 @@ import {
 describe("Rainglow editor themes", () => {
   beforeEach(() => localStorage.clear());
 
-  it("offers exactly ten light and ten dark themes", () => {
-    expect(RAINGLOW_THEMES).toHaveLength(20);
+  it("offers ten light and twenty-two dark themes", () => {
+    expect(RAINGLOW_THEMES).toHaveLength(32);
     expect(RAINGLOW_THEMES.filter((theme) => theme.variant === "light")).toHaveLength(10);
-    expect(RAINGLOW_THEMES.filter((theme) => theme.variant === "dark")).toHaveLength(10);
+    expect(RAINGLOW_THEMES.filter((theme) => theme.variant === "dark")).toHaveLength(22);
+    expect(RAINGLOW_THEMES.map((theme) => theme.name)).toEqual(expect.arrayContaining(["Peacock", "Peacocks in Space", "Rainbow", "Solarflare", "Mint Chocolate", "Horizon"]));
   });
 
   it("restores a persisted known theme", () => {
@@ -47,6 +48,9 @@ describe("Rainglow editor themes", () => {
     expect(root.style.getPropertyValue("--text")).toBe("#ffffff");
     expect(root.style.getPropertyValue("--focus")).toBe("#52708b");
     expect(root.style.getPropertyValue("--surface")).toContain("#181d26");
+    expect(root.style.getPropertyValue("--danger")).toBe("#ff8585");
+    expect(root.style.getPropertyValue("--warning")).toBe("#f0bd55");
+    expect(root.style.getPropertyValue("--info")).toBe("#7dbbfa");
   });
 
   it("applies a light Rainglow preset to the complete application", () => {

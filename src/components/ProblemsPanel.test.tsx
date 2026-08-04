@@ -31,7 +31,9 @@ it("shows actionable diagnostic detail and navigates to the source", async () =>
   const onVisit = vi.fn();
   render(<ProblemsPanel diagnostics={diagnostics} onVisit={onVisit} />);
   expect(screen.getByText(/wrong value type/i)).toBeVisible();
+  await userEvent.click(screen.getByText(/wrong value type/i));
   expect(screen.getByText(/replace the quoted text/i)).toBeVisible();
+  await userEvent.click(screen.getByText(/technical details/i));
   expect(screen.getByText(/expected: integer/i)).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: /go to line 2/i }));
   expect(onVisit).toHaveBeenCalledWith(diagnostics[0]);
@@ -48,6 +50,7 @@ it("offers a one click source update for deprecated keys", async () => {
   };
   const onFix = vi.fn();
   render(<ProblemsPanel diagnostics={[deprecated]} onFix={onFix} onVisit={() => undefined} />);
+  await userEvent.click(screen.getByText(/deprecated key/i));
   await userEvent.click(screen.getByRole("button", { name: /update key/i }));
   expect(onFix).toHaveBeenCalledWith(deprecated);
 });
@@ -62,25 +65,41 @@ it("groups findings by severity with errors open and other groups collapsible", 
   render(<ProblemsPanel diagnostics={[...diagnostics, warning, information]} onVisit={() => undefined} />);
 
   expect(screen.getByRole("button", { name: /errors.*1/i })).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getByText(/value is text/i)).toBeVisible();
+  expect(screen.getByText(/wrong value type/i)).toBeVisible();
   expect(screen.getByRole("button", { name: /warnings.*1/i })).toHaveAttribute("aria-expanded", "false");
   expect(screen.queryByText(/complete warning explanation/i)).not.toBeInTheDocument();
 
   await userEvent.click(screen.getByRole("button", { name: /expand all/i }));
+  await userEvent.click(screen.getByText("Warning message"));
+  await userEvent.click(screen.getAllByText(/technical details/i)[1]!);
   expect(screen.getByText(/complete warning explanation/i)).toBeVisible();
-  expect(screen.getByText(/complete information explanation/i)).toBeVisible();
 
   await userEvent.click(screen.getByRole("button", { name: /collapse all/i }));
-  expect(screen.queryByText(/value is text/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/wrong value type/i)).not.toBeInTheDocument();
 });
 
 it("shows complete metadata without truncation and omits false source locations", async () => {
   const actual = `{"content":"${"x".repeat(300)}"}`;
   render(<ProblemsPanel diagnostics={[{ ...diagnostics[0]!, actual }, information]} onVisit={() => undefined} />);
 
+  await userEvent.click(screen.getByText(/wrong value type/i));
+  await userEvent.click(screen.getByText(/technical details/i));
   expect(screen.getByText(`Actual: ${actual}`)).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: /expand all/i }));
   expect(screen.queryByRole("button", { name: /go to line 1/i })).not.toBeInTheDocument();
+});
+
+it("keeps very long diagnostic text out of the compact problem card", async () => {
+  const message = `Tables are not ordered: ${"table_name, ".repeat(100)}`;
+  render(<ProblemsPanel diagnostics={[{ ...warning, severity: "error", message }]} onVisit={() => undefined} />);
+  const summary = screen.getAllByText(/tables are not ordered/i)[0]!;
+  expect(summary.textContent?.length).toBeLessThanOrEqual(180);
+  const fullProblem = screen.getByText("Full problem:").parentElement!;
+  expect(fullProblem).not.toBeVisible();
+  await userEvent.click(summary);
+  await userEvent.click(screen.getByText(/technical details/i));
+  expect(fullProblem).toBeVisible();
+  expect(fullProblem).toHaveTextContent(message.trim());
 });
 
 it("copies a complete plain text diagnostic report", async () => {

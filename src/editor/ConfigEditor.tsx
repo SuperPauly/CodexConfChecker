@@ -1,4 +1,4 @@
-import { Text, type Extension } from "@codemirror/state";
+import { StateEffect, StateField, Text, type Extension } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -8,7 +8,7 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { Diagnostic, DiagnosticKind, DiagnosticSeverity } from "../diagnostics/types";
 import { shouldValidateTransactions } from "./diagnostics";
@@ -36,11 +36,15 @@ const severityRank: Record<DiagnosticSeverity, number> = {
   info: 1,
 };
 
-function diagnosticExtensions(
-  value: string,
-  diagnostics: readonly Diagnostic[],
-): Extension[] {
-  const doc = Text.of(value.split("\n"));
+interface EditorDiagnostics {
+  readonly diagnostics: readonly Diagnostic[];
+  readonly decorations: DecorationSet;
+  readonly lines: ReadonlyMap<number, { severity: DiagnosticSeverity; kind?: DiagnosticKind }>;
+}
+
+const setDiagnostics = StateEffect.define<readonly Diagnostic[]>();
+
+function buildDiagnostics(doc: Text, diagnostics: readonly Diagnostic[]): EditorDiagnostics {
   const lines = new Map<number, { severity: DiagnosticSeverity; kind?: DiagnosticKind }>();
   const maximumOffset = Math.max(0, doc.length - 1);
   for (const diagnostic of diagnostics) {
@@ -57,17 +61,29 @@ function diagnosticExtensions(
     ),
     true,
   );
-  return [
-    EditorView.decorations.of(decorations),
-    gutter({
-      class: "cm-diagnostic-gutter",
-      lineMarker: (_view, line) => {
-        const diagnostic = lines.get(line.from);
-        return diagnostic ? markerBySeverity[diagnostic.severity] : null;
-      },
-    }),
-  ];
+  return { diagnostics, decorations, lines };
 }
+
+const diagnosticState = StateField.define<EditorDiagnostics>({
+  create: (state) => buildDiagnostics(state.doc, []),
+  update: (current, transaction) => {
+    const effect = transaction.effects.find((candidate) => candidate.is(setDiagnostics));
+    if (effect) return buildDiagnostics(transaction.state.doc, effect.value);
+    return transaction.docChanged ? buildDiagnostics(transaction.state.doc, current.diagnostics) : current;
+  },
+  provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
+});
+
+const diagnosticExtension: Extension = [
+  diagnosticState,
+  gutter({
+    class: "cm-diagnostic-gutter",
+    lineMarker: (view, line) => {
+      const diagnostic = view.state.field(diagnosticState).lines.get(line.from);
+      return diagnostic ? markerBySeverity[diagnostic.severity] : null;
+    },
+  }),
+];
 
 export interface ConfigEditorProps {
   readonly value: string;
@@ -92,16 +108,27 @@ export function ConfigEditor({
   ariaLabel = `${languageLabel(language)} configuration editor`,
   placeholder,
 }: ConfigEditorProps) {
+  const editorRef = useRef<EditorView | undefined>(undefined);
   const extensions = useMemo(
     () => [
       languageExtension(language),
       editorThemeExtension(themeId),
       EditorView.lineWrapping,
       EditorView.contentAttributes.of({ "aria-label": ariaLabel, spellcheck: "false" }),
-      ...diagnosticExtensions(value, diagnostics),
+      diagnosticExtension,
     ],
-    [ariaLabel, diagnostics, language, themeId, value],
+    [ariaLabel, language, themeId],
   );
+
+  useEffect(() => {
+    editorRef.current?.dispatch({ effects: setDiagnostics.of(diagnostics) });
+  }, [diagnostics]);
+
+  const handleCreateEditor = useCallback((view: EditorView) => {
+    editorRef.current = view;
+    view.dispatch({ effects: setDiagnostics.of(diagnostics) });
+    onCreateEditor(view);
+  }, [diagnostics, onCreateEditor]);
 
   const handleUpdate = (update: ViewUpdate) => {
     if (shouldValidateTransactions(update.transactions)) onValidationTrigger();
@@ -109,14 +136,14 @@ export function ConfigEditor({
 
   return (
     <CodeMirror
-      aria-label={ariaLabel}
       className="config-editor"
+      data-editor-label={ariaLabel}
       extensions={extensions}
       height="100%"
       indentWithTab={false}
       onBlur={onValidationTrigger}
       onChange={onChange}
-      onCreateEditor={onCreateEditor}
+      onCreateEditor={handleCreateEditor}
       onUpdate={handleUpdate}
       {...(placeholder === undefined ? {} : { placeholder })}
       value={value}
