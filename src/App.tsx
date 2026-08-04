@@ -295,7 +295,7 @@ export function ValidatorWorkbench({ engine, manifest, onThemeChange, themeId }:
 
         <ProblemsPanel diagnostics={diagnostics} onVisit={visitDiagnostic} />
 
-        <p className="privacy-note">Configuration processing stays in your browser. Optional anonymous visit metrics only start after consent.</p>
+        <p className="privacy-note">Configuration processing stays in your browser. Optional site visit metrics only start after consent.</p>
       </section>
     </main>
   );

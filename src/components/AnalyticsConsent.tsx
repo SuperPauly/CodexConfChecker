@@ -42,7 +42,7 @@ export function AnalyticsConsent({ measurementId }: { readonly measurementId?: s
     <aside aria-labelledby="analytics-consent-title" className="analytics-consent" role="region">
       <div>
         <strong id="analytics-consent-title">Visitor analytics</strong>
-        <p>Allow anonymous page visit metrics to help improve this tool. Configuration files and validation results are never sent.</p>
+        <p>Allow basic site visit metrics to help improve this tool. Configuration files and validation results are never sent.</p>
       </div>
       <div className="analytics-consent-actions">
         <button className="button button-primary" onClick={() => choose("granted")} type="button">Allow analytics</button>
