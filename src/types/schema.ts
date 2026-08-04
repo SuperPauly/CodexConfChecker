@@ -1,14 +1,26 @@
-export type SchemaChannel = "stable" | "alpha";
+import type { ConfigFormat } from "../formats/types";
 
-export interface SchemaEntry {
+export type SchemaChannel = "stable" | "alpha" | "archive";
+
+export interface SchemaVersion {
+  readonly id: string;
+  readonly label: string;
+  readonly channel: SchemaChannel;
   readonly version: string;
-  readonly tag: string;
   readonly sha256: string;
   readonly sourceUrl: string;
+  readonly assetPath: string;
   readonly syncedAt: string;
+}
+
+export interface SchemaProgram {
+  readonly name: string;
+  readonly defaultFormat: ConfigFormat;
+  readonly outputBaseName: string;
+  readonly versions: readonly SchemaVersion[];
 }
 
 export interface SchemaManifest {
   readonly generatedAt: string;
-  readonly channels: Readonly<Record<SchemaChannel, SchemaEntry>>;
+  readonly programs: Readonly<Record<string, SchemaProgram>>;
 }

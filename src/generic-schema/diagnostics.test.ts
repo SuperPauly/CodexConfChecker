@@ -32,12 +32,15 @@ describe("schema diagnostics", () => {
   });
 
   it("names unexpected properties and type mismatches", () => {
-    const additional = translateSchemaProblem({ keyword: "additionalProperties", instancePath: "/server", schemaPath: "#/additionalProperties", message: "must NOT have additional properties", params: { additionalProperty: "debug" } }, { source, value: { server: { debug: true } }, locations });
+    const additional = translateSchemaProblem({ keyword: "additionalProperties", instancePath: "/server", schemaPath: "#/additionalProperties", message: "must NOT have additional properties", params: { additionalProperty: "debug" } }, { source, value: { server: { debug: true } }, locations, knownPropertyNames: new Set(["debug"]) });
+    const unknown = translateSchemaProblem({ keyword: "additionalProperties", instancePath: "/server", schemaPath: "#/additionalProperties", message: "must NOT have additional properties", params: { additionalProperty: "mystery" } }, { source, value: { server: { mystery: true } }, locations, knownPropertyNames: new Set(["debug"]) });
     const type = translateSchemaProblem({ keyword: "type", instancePath: "/server/host", schemaPath: "#/properties/host/type", message: "must be string", params: { type: "string" }, data: 42 }, { source, value: { server: { host: 42 } }, locations });
 
-    expect(additional.message).toContain("Unexpected property `debug`");
-    expect(additional.suggestion).toContain("Remove `debug`");
-    expect(type).toMatchObject({ expected: "string", actual: "42", ruleId: "schema/type" });
+    expect(additional.message).toContain("`debug` is under the wrong table");
+    expect(additional.suggestion).toContain("Move `debug`");
+    expect(additional.kind).toBe("wrong-table");
+    expect(unknown.kind).toBe("unknown-key");
+    expect(type).toMatchObject({ expected: "string", actual: "42", ruleId: "schema/type", kind: "wrong-type" });
   });
 
   it("does not attach schema compiler failures to configuration line 1", () => {

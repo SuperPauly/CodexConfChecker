@@ -7,6 +7,15 @@ export type DiagnosticSource =
   | "format"
   | "system";
 
+export type DiagnosticKind = "unknown-key" | "wrong-table" | "wrong-type" | "deprecated";
+
+export interface DiagnosticFix {
+  readonly label: string;
+  readonly from: number;
+  readonly to: number;
+  readonly replacement: string;
+}
+
 export interface SourceRange {
   readonly from: number;
   readonly to: number;
@@ -29,4 +38,6 @@ export interface Diagnostic extends SourceRange {
   readonly expected?: string;
   readonly actual?: string;
   readonly fileName?: string;
+  readonly kind?: DiagnosticKind;
+  readonly fix?: DiagnosticFix;
 }

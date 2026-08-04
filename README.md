@@ -1,33 +1,44 @@
 # Codex Config Checker
 
-A static, browser-only configuration validator, linter, and formatter. The default
-Codex workspace checks `config.toml` against tracked Codex releases. The generic
-JSON Schema Workbench checks JSON, YAML, or TOML against a schema you upload.
+A static, browser-only configuration validator, linter, formatter, and converter.
+The unified workbench checks JSON, YAML, or TOML against a tracked Codex schema
+or a JSON Schema you upload.
 
 ## Features
 
 - Validates TOML with Taplo WebAssembly and the selected Codex release schema
-- Tracks the latest stable and alpha Codex release schemas
+- Gets the current stable Codex schema from OpenAI's documentation and release
+  schemas from exact GitHub release assets named `config-schema.json`
+- Selects the latest stable or alpha schema, or searches a scrollable archive of
+  older release versions
 - Validates JSON, YAML, and TOML against JSON Schema drafts 4, 7, 2019-09, and 2020-12
 - Supports internal `$ref` values or an uploaded local schema bundle, without network fetching
 - Runs configurable format-specific lint rules with Off, Info, Warning, and Error severities
 - Explains every finding with its precise location, reason, suggested fix, actual value, expected value, data path, and schema path when available
-- Highlights complete editor lines by severity and filters the Problems view by severity or source
+- Highlights unknown keys in red, keys under the wrong table in orange, and
+  wrong value types in green
+- Offers one-click migration fixes for supported removed or renamed Codex keys
+- Highlights complete editor lines and filters the Problems view by severity or source
 - Formats JSON and YAML with Prettier and TOML with Taplo
 - Includes 20 curated Rainglow editor colour themes, split evenly between dark and light presets
 - Imports and exports lint settings as JSON
 - Upload, paste, copy, download, format, validate, and clear controls
+- Downloads a successfully validated configuration as JSON, YAML, or TOML
 - Responsive layout with System, Light, and Dark themes
 - Keeps configuration and schema text entirely inside the browser
 
-## JSON Schema Workbench
+## Using the workbench
 
-1. Open the **JSON Schema Workbench** tab.
+1. Choose a program and use **Select Version** to load its latest stable, latest
+   alpha, or an older tracked schema.
 2. Paste a configuration or upload a `.json`, `.yaml`, `.yml`, or `.toml` file.
-3. Upload a primary JSON Schema. For multi-file schemas, upload dependency files
-   and select **Uploaded local bundle**.
+3. To use your own schema instead, upload a primary JSON Schema. Version
+   selection remains locked until that custom schema is removed. For multi-file
+   schemas, upload dependency files and select **Uploaded local bundle**.
 4. Choose **Validate**. Ordinary typing does not trigger validation; Enter,
    pointer movement, and editor blur do.
+5. After a successful validation, open **Download** and choose JSON, YAML, or
+   TOML. Editing the configuration requires validating it again before download.
 
 Remote schema references are deliberately blocked. Local dependencies are
 matched by filename or declared `$id`. Configuration files are limited to 2 MiB;
@@ -51,18 +62,20 @@ npm run build
 
 ## Schema updates
 
-`scripts/sync-schemas.mjs` selects the newest Codex tags matching stable
-`rust-vX.Y.Z` and alpha `rust-vX.Y.Z-alpha...`, then downloads each exact tagged
-`codex-rs/core/config.schema.json` file. It writes only verified JSON and records
-the release tag and SHA256 digest in `public/schemas/manifest.json`.
+`scripts/sync-schemas.mjs` downloads the current stable schema from
+`https://learn.chatgpt.com/docs/config-schema.json`. It also reads Codex GitHub
+releases and downloads every exact release asset named `config-schema.json`,
+including alpha releases and older versions. It writes only verified JSON and
+records each source, release version, SHA256 digest, and successful synchronization
+time in `public/schemas/manifest.json`.
 
 The `Sync Codex schemas` workflow runs this check every 30 minutes. Meaningful
 schema or release metadata changes are committed to `main`, which starts the
 separate tested GitHub Pages deployment workflow.
 
-Each stable and alpha manifest entry records its own `syncedAt` timestamp. The
-website shows this as the last time that exact release schema was successfully
-copied from OpenAI and merged into this repository.
+Each manifest entry records its own `syncedAt` timestamp. The website shows this
+as the last time that exact schema was successfully copied from OpenAI and merged
+into this repository.
 
 ## Optional visitor analytics
 

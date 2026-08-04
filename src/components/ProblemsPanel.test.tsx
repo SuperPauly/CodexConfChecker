@@ -37,6 +37,21 @@ it("shows actionable diagnostic detail and navigates to the source", async () =>
   expect(onVisit).toHaveBeenCalledWith(diagnostics[0]);
 });
 
+it("offers a one click source update for deprecated keys", async () => {
+  const deprecated: Diagnostic = {
+    ...diagnostics[0]!,
+    severity: "error",
+    ruleId: "codex/deprecated-key",
+    kind: "unknown-key",
+    message: "Deprecated key `agents.max_threads`.",
+    fix: { label: "Update key", from: 7, to: 18, replacement: "max_concurrent_threads_per_session" },
+  };
+  const onFix = vi.fn();
+  render(<ProblemsPanel diagnostics={[deprecated]} onFix={onFix} onVisit={() => undefined} />);
+  await userEvent.click(screen.getByRole("button", { name: /update key/i }));
+  expect(onFix).toHaveBeenCalledWith(deprecated);
+});
+
 it("filters by severity", async () => {
   render(<ProblemsPanel diagnostics={diagnostics} onVisit={() => undefined} />);
   await userEvent.selectOptions(screen.getByLabelText(/severity filter/i), "warning");

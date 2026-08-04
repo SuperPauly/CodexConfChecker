@@ -7,15 +7,16 @@ import type { Diagnostic, DiagnosticSeverity } from "../diagnostics/types";
 export interface ProblemsPanelProps {
   readonly diagnostics: readonly Diagnostic[];
   readonly onVisit: (diagnostic: Diagnostic) => void;
+  readonly onFix?: (diagnostic: Diagnostic) => void;
 }
 
 const icons = { error: CircleAlert, warning: TriangleAlert, info: Info };
 const severityLabels = { error: "Errors", warning: "Warnings", info: "Information" } as const;
 const severityOrder = ["error", "warning", "info"] as const;
 
-function ProblemItem({ diagnostic, index, onVisit }: { readonly diagnostic: Diagnostic; readonly index: number; readonly onVisit: (diagnostic: Diagnostic) => void }) {
+function ProblemItem({ diagnostic, index, onFix, onVisit }: { readonly diagnostic: Diagnostic; readonly index: number; readonly onFix?: (diagnostic: Diagnostic) => void; readonly onVisit: (diagnostic: Diagnostic) => void }) {
   const Icon = icons[diagnostic.severity];
-  return <li className={`problem-item problem-${diagnostic.severity}`} key={`${diagnostic.ruleId}-${diagnostic.from}-${index}`}>
+  return <li className={`problem-item problem-${diagnostic.severity}${diagnostic.kind ? ` problem-kind-${diagnostic.kind}` : ""}`} key={`${diagnostic.ruleId}-${diagnostic.from}-${index}`}>
     <div className="problem-summary">
       <Icon aria-hidden="true" size={18} />
       <div><strong>{diagnostic.message}</strong><small>{diagnostic.source} · {diagnostic.ruleId}</small></div>
@@ -30,11 +31,12 @@ function ProblemItem({ diagnostic, index, onVisit }: { readonly diagnostic: Diag
         {diagnostic.dataPath !== undefined ? <code>Data path: {diagnostic.dataPath || "/"}</code> : null}
         {diagnostic.schemaPath ? <code>Schema path: {diagnostic.schemaPath}</code> : null}
       </div>
+      {diagnostic.fix && onFix ? <button className="diagnostic-fix" onClick={() => onFix(diagnostic)} type="button">{diagnostic.fix.label}</button> : null}
     </div>
   </li>;
 }
 
-export function ProblemsPanel({ diagnostics, onVisit }: ProblemsPanelProps) {
+export function ProblemsPanel({ diagnostics, onFix, onVisit }: ProblemsPanelProps) {
   const [severity, setSeverity] = useState<DiagnosticSeverity | "all">("all");
   const [source, setSource] = useState("all");
   const [expanded, setExpanded] = useState<ReadonlySet<DiagnosticSeverity>>(() => new Set(["error"]));
@@ -65,7 +67,7 @@ export function ProblemsPanel({ diagnostics, onVisit }: ProblemsPanelProps) {
         {visible.length ? <div className="problem-tools"><button onClick={() => setExpanded(new Set(groups.map((group) => group.severity)))} type="button">Expand all</button><button onClick={() => setExpanded(new Set())} type="button">Collapse all</button><button onClick={() => void copyReport()} type="button"><Clipboard aria-hidden="true" size={14} /> Copy report</button></div> : null}
       </div>
       {visible.length === 0 ? <div className="empty-problems"><CircleCheck aria-hidden="true" size={18} /> {diagnostics.length ? "No problems match these filters." : "No reported problems."}</div> : (
-        <div className="problem-groups">{groups.map((group) => <section className={`problem-group group-${group.severity}`} key={group.severity}><button aria-expanded={expanded.has(group.severity)} className="problem-group-toggle" onClick={() => toggle(group.severity)} type="button"><span>{severityLabels[group.severity]}</span><strong>{group.items.length}</strong><ChevronDown aria-hidden="true" size={17} /></button>{expanded.has(group.severity) ? <ol>{group.items.map((diagnostic, index) => <ProblemItem diagnostic={diagnostic} index={index} key={`${diagnostic.ruleId}-${diagnostic.from}-${index}`} onVisit={onVisit} />)}</ol> : null}</section>)}</div>
+        <div className="problem-groups">{groups.map((group) => <section className={`problem-group group-${group.severity}`} key={group.severity}><button aria-expanded={expanded.has(group.severity)} className="problem-group-toggle" onClick={() => toggle(group.severity)} type="button"><span>{severityLabels[group.severity]}</span><strong>{group.items.length}</strong><ChevronDown aria-hidden="true" size={17} /></button>{expanded.has(group.severity) ? <ol>{group.items.map((diagnostic, index) => <ProblemItem diagnostic={diagnostic} index={index} key={`${diagnostic.ruleId}-${diagnostic.from}-${index}`} {...(onFix ? { onFix } : {})} onVisit={onVisit} />)}</ol> : null}</section>)}</div>
       )}
     </section>
   );

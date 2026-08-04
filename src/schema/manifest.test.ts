@@ -2,55 +2,45 @@ import { describe, expect, it } from "vitest";
 
 import { parseSchemaManifest, schemaAssetUrl } from "./manifest";
 
+const version = {
+  id: "stable-current",
+  label: "Current stable",
+  channel: "stable",
+  version: "Current stable",
+  sha256: "a".repeat(64),
+  sourceUrl: "https://learn.chatgpt.com/docs/config-schema.json",
+  assetPath: "schemas/codex/stable-current/config-schema.json",
+  syncedAt: "2026-08-04T12:00:00Z",
+};
+
 describe("parseSchemaManifest", () => {
-  it("accepts stable and alpha entries", () => {
+  it("accepts a program registry with ordered schema versions", () => {
     const manifest = parseSchemaManifest({
-      generatedAt: "2026-08-02T12:00:00Z",
-      channels: {
-        stable: {
-          version: "0.146.0",
-          tag: "rust-v0.146.0",
-          sha256: "a".repeat(64),
-          sourceUrl: "https://github.com/openai/codex",
-          syncedAt: "2026-08-01T10:30:00Z",
-        },
-        alpha: {
-          version: "0.147.0-alpha.4",
-          tag: "rust-v0.147.0-alpha.4",
-          sha256: "b".repeat(64),
-          sourceUrl: "https://github.com/openai/codex",
-          syncedAt: "2026-08-02T12:00:00Z",
+      generatedAt: "2026-08-04T12:00:00Z",
+      programs: {
+        codex: {
+          name: "Codex CLI",
+          defaultFormat: "toml",
+          outputBaseName: "config",
+          versions: [version, { ...version, id: "rust-v0.147.0-alpha.7", label: "v0.147.0-alpha.7", channel: "alpha", version: "v0.147.0-alpha.7", sha256: "b".repeat(64) }],
         },
       },
     });
 
-    expect(manifest.channels.alpha.version).toBe("0.147.0-alpha.4");
-    expect(manifest.channels.stable.syncedAt).toBe("2026-08-01T10:30:00Z");
+    expect(manifest.programs.codex!.name).toBe("Codex CLI");
+    expect(manifest.programs.codex!.versions[1]?.channel).toBe("alpha");
   });
 
-  it("rejects missing or malformed per-channel synchronization times", () => {
-    const entry = {
-      version: "0.146.0",
-      tag: "rust-v0.146.0",
-      sha256: "a".repeat(64),
-      sourceUrl: "https://github.com/openai/codex",
+  it("rejects unsafe or duplicate version asset paths", () => {
+    const base = {
+      generatedAt: "2026-08-04T12:00:00Z",
+      programs: { codex: { name: "Codex CLI", defaultFormat: "toml", outputBaseName: "config", versions: [version] } },
     };
-
-    expect(() => parseSchemaManifest({
-      generatedAt: "2026-08-02T12:00:00Z",
-      channels: { stable: entry, alpha: { ...entry, syncedAt: "not-a-date" } },
-    })).toThrow(/syncedAt/u);
+    expect(() => parseSchemaManifest({ ...base, programs: { codex: { ...base.programs.codex, versions: [{ ...version, assetPath: "../secret.json" }] } } })).toThrow(/assetPath/u);
+    expect(() => parseSchemaManifest({ ...base, programs: { codex: { ...base.programs.codex, versions: [version, { ...version }] } } })).toThrow(/duplicate/u);
   });
 
-  it("rejects a manifest without both channels", () => {
-    expect(() =>
-      parseSchemaManifest({ generatedAt: "x", channels: {} }),
-    ).toThrow("stable");
-  });
-
-  it("builds a GitHub Pages safe schema URL", () => {
-    expect(schemaAssetUrl("stable")).toBe(
-      `${import.meta.env.BASE_URL}schemas/stable/config.schema.json`,
-    );
+  it("builds a GitHub Pages safe URL from a registry asset path", () => {
+    expect(schemaAssetUrl(version)).toBe(`${import.meta.env.BASE_URL}schemas/codex/stable-current/config-schema.json`);
   });
 });

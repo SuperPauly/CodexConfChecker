@@ -10,7 +10,7 @@ import {
 import CodeMirror from "@uiw/react-codemirror";
 import { useMemo } from "react";
 
-import type { Diagnostic, DiagnosticSeverity } from "../diagnostics/types";
+import type { Diagnostic, DiagnosticKind, DiagnosticSeverity } from "../diagnostics/types";
 import { shouldValidateTransactions } from "./diagnostics";
 import { languageExtension, languageLabel, type EditorLanguage } from "./languages";
 import { editorThemeExtension, type RainglowThemeId } from "./rainglow";
@@ -41,19 +41,19 @@ function diagnosticExtensions(
   diagnostics: readonly Diagnostic[],
 ): Extension[] {
   const doc = Text.of(value.split("\n"));
-  const lines = new Map<number, DiagnosticSeverity>();
+  const lines = new Map<number, { severity: DiagnosticSeverity; kind?: DiagnosticKind }>();
   const maximumOffset = Math.max(0, doc.length - 1);
   for (const diagnostic of diagnostics) {
     if (diagnostic.hasSourceLocation === false) continue;
     const line = doc.lineAt(Math.min(Math.max(0, diagnostic.from), maximumOffset));
     const current = lines.get(line.from);
-    if (!current || severityRank[diagnostic.severity] > severityRank[current]) {
-      lines.set(line.from, diagnostic.severity);
+    if (!current || severityRank[diagnostic.severity] > severityRank[current.severity] || (diagnostic.kind && !current.kind)) {
+      lines.set(line.from, { severity: diagnostic.severity, ...(diagnostic.kind ? { kind: diagnostic.kind } : {}) });
     }
   }
   const decorations: DecorationSet = Decoration.set(
-    [...lines].map(([from, severity]) =>
-      Decoration.line({ class: `cm-diagnostic-line cm-${severity}-line` }).range(from),
+    [...lines].map(([from, diagnostic]) =>
+      Decoration.line({ class: `cm-diagnostic-line cm-${diagnostic.kind ?? diagnostic.severity}-line` }).range(from),
     ),
     true,
   );
@@ -62,8 +62,8 @@ function diagnosticExtensions(
     gutter({
       class: "cm-diagnostic-gutter",
       lineMarker: (_view, line) => {
-        const severity = lines.get(line.from);
-        return severity ? markerBySeverity[severity] : null;
+        const diagnostic = lines.get(line.from);
+        return diagnostic ? markerBySeverity[diagnostic.severity] : null;
       },
     }),
   ];

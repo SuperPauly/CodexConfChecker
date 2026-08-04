@@ -8,6 +8,7 @@ export interface TomlEngine {
   validate(toml: string, schemaUrl: string): Promise<ValidationResult>;
   format(toml: string): string;
   decode(toml: string): unknown;
+  encode(value: object): string;
 }
 
 interface RangeObject {
@@ -185,6 +186,14 @@ export class TaploService implements TomlEngine {
   decode(toml: string): unknown {
     try {
       return this.#taplo.decode(toml);
+    } catch (error) {
+      throw normalizeError(error);
+    }
+  }
+
+  encode(value: object): string {
+    try {
+      return this.#taplo.encode(value);
     } catch (error) {
       throw normalizeError(error);
     }

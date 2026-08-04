@@ -1,172 +1,88 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import { sha256, synchronizeSchemas } from "./sync-schemas.mjs";
 
-const stableSchema = JSON.stringify({
-  type: "object",
-  additionalProperties: false,
-});
-const alphaSchema = JSON.stringify({ type: "object", properties: {} });
+const stableSchema = JSON.stringify({ type: "object", title: "stable" });
+const alphaSix = JSON.stringify({ type: "object", title: "alpha six" });
+const alphaSeven = JSON.stringify({ type: "object", title: "alpha seven" });
+const stableUrl = "https://learn.chatgpt.com/docs/config-schema.json";
+const assetUrl = "https://downloads.example/config-schema.json";
 
-function response(body, status = 200) {
-  return new Response(body, { status });
+function response(body, status = 200) { return new Response(body, { status }); }
+
+function releases(tag = "rust-v0.147.0-alpha.7", assetName = "config-schema.json") {
+  return [{
+    tag_name: tag,
+    name: tag.replace("rust-v", ""),
+    published_at: "2026-08-04T11:50:00Z",
+    draft: false,
+    prerelease: true,
+    html_url: `https://github.com/openai/codex/releases/tag/${tag}`,
+    assets: [{ name: assetName, browser_download_url: assetUrl }],
+  }];
 }
 
-test("writes exact tag schemas and manifest", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "codex-schema-sync-"));
-  const fetchImpl = async (url) => {
+function fetcher(schema = alphaSeven, releaseList = releases()) {
+  return async (url) => {
     const value = String(url);
-    if (value.endsWith("/releases?per_page=100")) {
-      return response(
-        JSON.stringify([
-          { tag_name: "rust-v0.146.0", published_at: "2026-08-01T00:00:00Z", draft: false },
-          { tag_name: "rust-v0.147.0-alpha.4", published_at: "2026-08-02T00:00:00Z", draft: false },
-        ]),
-      );
-    }
-    return response(value.includes("alpha.4") ? alphaSchema : stableSchema);
+    if (value.includes("/releases?")) return response(JSON.stringify(releaseList));
+    if (value === stableUrl) return response(stableSchema);
+    if (value === assetUrl) return response(schema);
+    return response("not found", 404);
   };
+}
 
+test("gets current stable from ChatGPT docs and alpha from the exact release asset", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "codex-registry-"));
+  const requested = [];
+  const baseFetch = fetcher();
   const result = await synchronizeSchemas({
     root,
-    fetchImpl,
-    now: () => new Date("2026-08-02T12:00:00Z"),
+    fetchImpl: async (url, options) => { requested.push(String(url)); return baseFetch(url, options); },
+    now: () => new Date("2026-08-04T12:00:00Z"),
   });
 
   assert.equal(result.changed, true);
-  assert.equal(
-    await readFile(path.join(root, "stable/config.schema.json"), "utf8"),
-    `${stableSchema}\n`,
-  );
-  const manifest = JSON.parse(
-    await readFile(path.join(root, "manifest.json"), "utf8"),
-  );
-  assert.equal(manifest.channels.alpha.version, "v0.147.0-alpha.4");
-  assert.equal(manifest.channels.stable.sha256, sha256(`${stableSchema}\n`));
-  assert.equal(manifest.channels.stable.syncedAt, "2026-08-02T12:00:00.000Z");
-  assert.equal(manifest.channels.alpha.syncedAt, "2026-08-02T12:00:00.000Z");
+  assert.ok(requested.includes(stableUrl));
+  assert.ok(requested.includes(assetUrl));
+  assert.equal(await readFile(path.join(root, "codex/stable-current/config-schema.json"), "utf8"), `${stableSchema}\n`);
+  assert.equal(await readFile(path.join(root, "codex/releases/rust-v0.147.0-alpha.7/config-schema.json"), "utf8"), `${alphaSeven}\n`);
+  assert.equal(result.manifest.programs.codex.versions[0].id, "stable-current");
+  assert.equal(result.manifest.programs.codex.versions[1].version, "v0.147.0-alpha.7");
+  assert.equal(result.manifest.programs.codex.versions[0].sha256, sha256(`${stableSchema}\n`));
 });
 
-test("reports unchanged when tags and schema hashes match", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "codex-schema-sync-"));
-  let requests = 0;
-  const fetchImpl = async (url) => {
-    requests += 1;
-    const value = String(url);
-    if (value.endsWith("/releases?per_page=100")) {
-      return response(
-        JSON.stringify([
-          { tag_name: "rust-v0.146.0", published_at: "2026-08-01T00:00:00Z", draft: false },
-          { tag_name: "rust-v0.147.0-alpha.4", published_at: "2026-08-02T00:00:00Z", draft: false },
-        ]),
-      );
-    }
-    return response(value.includes("alpha.4") ? alphaSchema : stableSchema);
-  };
+test("retains older alpha versions when a newer release appears", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "codex-registry-"));
+  await synchronizeSchemas({ root, fetchImpl: fetcher(alphaSix, releases("rust-v0.147.0-alpha.6")), now: () => new Date("2026-08-03T12:00:00Z") });
+  const result = await synchronizeSchemas({ root, fetchImpl: fetcher(), now: () => new Date("2026-08-04T12:00:00Z") });
 
-  await synchronizeSchemas({ root, fetchImpl, now: () => new Date(0) });
-  const result = await synchronizeSchemas({ root, fetchImpl, now: () => new Date(1) });
+  assert.deepEqual(result.manifest.programs.codex.versions.map((entry) => entry.id), [
+    "stable-current",
+    "rust-v0.147.0-alpha.7",
+    "rust-v0.147.0-alpha.6",
+  ]);
+  assert.equal(await readFile(path.join(root, "codex/releases/rust-v0.147.0-alpha.6/config-schema.json"), "utf8"), `${alphaSix}\n`);
+});
 
+test("reports unchanged when source hashes and latest alpha match", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "codex-registry-"));
+  await synchronizeSchemas({ root, fetchImpl: fetcher(), now: () => new Date(0) });
+  const result = await synchronizeSchemas({ root, fetchImpl: fetcher(), now: () => new Date(1) });
   assert.equal(result.changed, false);
-  assert.equal(requests, 6);
-  assert.equal(result.manifest.channels.stable.syncedAt, "1970-01-01T00:00:00.000Z");
-  assert.equal(result.manifest.channels.alpha.syncedAt, "1970-01-01T00:00:00.000Z");
+  assert.equal(result.manifest.programs.codex.versions[0].syncedAt, "1970-01-01T00:00:00.000Z");
 });
 
-test("updates only the timestamp for the channel whose release schema changed", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "codex-schema-sync-"));
-  let alphaRevision = 1;
-  const fetchImpl = async (url) => {
-    const value = String(url);
-    if (value.endsWith("/releases?per_page=100")) {
-      return response(
-        JSON.stringify([
-          { tag_name: "rust-v0.146.0", published_at: "2026-08-01T00:00:00Z", draft: false },
-          { tag_name: "rust-v0.147.0-alpha.4", published_at: "2026-08-02T00:00:00Z", draft: false },
-        ]),
-      );
-    }
-    return response(value.includes("alpha.4") ? JSON.stringify({ revision: alphaRevision }) : stableSchema);
-  };
-
-  await synchronizeSchemas({
-    root,
-    fetchImpl,
-    now: () => new Date("2026-08-02T12:00:00Z"),
-  });
-  alphaRevision = 2;
-  const result = await synchronizeSchemas({
-    root,
-    fetchImpl,
-    now: () => new Date("2026-08-04T09:30:00Z"),
-  });
-
-  assert.equal(result.changed, true);
-  assert.equal(result.manifest.channels.stable.syncedAt, "2026-08-02T12:00:00.000Z");
-  assert.equal(result.manifest.channels.alpha.syncedAt, "2026-08-04T09:30:00.000Z");
+test("requires the alpha release asset named config-schema.json", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "codex-registry-"));
+  await assert.rejects(synchronizeSchemas({ root, fetchImpl: fetcher(alphaSeven, releases("rust-v0.147.0-alpha.7", "codex.zip")) }), /config-schema\.json/u);
 });
 
-test("migrates an unchanged channel timestamp from the old generatedAt field", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "codex-schema-sync-"));
-  await mkdir(root, { recursive: true });
-  await writeFile(path.join(root, "manifest.json"), `${JSON.stringify({
-    generatedAt: "2026-08-01T08:00:00.000Z",
-    channels: {
-      stable: {
-        version: "v0.146.0",
-        tag: "rust-v0.146.0",
-        sha256: sha256(`${stableSchema}\n`),
-        sourceUrl: "https://example.test/stable",
-      },
-      alpha: {
-        version: "v0.147.0-alpha.3",
-        tag: "rust-v0.147.0-alpha.3",
-        sha256: "0".repeat(64),
-        sourceUrl: "https://example.test/alpha",
-      },
-    },
-  }, null, 2)}\n`);
-  const fetchImpl = async (url) => {
-    const value = String(url);
-    if (value.endsWith("/releases?per_page=100")) {
-      return response(JSON.stringify([
-        { tag_name: "rust-v0.146.0", published_at: "2026-08-01T00:00:00Z", draft: false },
-        { tag_name: "rust-v0.147.0-alpha.4", published_at: "2026-08-02T00:00:00Z", draft: false },
-      ]));
-    }
-    return response(value.includes("alpha.4") ? alphaSchema : stableSchema);
-  };
-
-  const result = await synchronizeSchemas({
-    root,
-    fetchImpl,
-    now: () => new Date("2026-08-04T09:30:00Z"),
-  });
-
-  assert.equal(result.manifest.channels.stable.syncedAt, "2026-08-01T08:00:00.000Z");
-  assert.equal(result.manifest.channels.alpha.syncedAt, "2026-08-04T09:30:00.000Z");
-});
-
-test("rejects malformed schema JSON without replacing files", async () => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "codex-schema-sync-"));
-  const fetchImpl = async (url) => {
-    if (String(url).endsWith("/releases?per_page=100")) {
-      return response(
-        JSON.stringify([
-          { tag_name: "rust-v0.146.0", published_at: "2026-08-01T00:00:00Z", draft: false },
-          { tag_name: "rust-v0.147.0-alpha.4", published_at: "2026-08-02T00:00:00Z", draft: false },
-        ]),
-      );
-    }
-    return response("not-json");
-  };
-
-  await assert.rejects(
-    synchronizeSchemas({ root, fetchImpl, now: () => new Date(0) }),
-    /valid JSON/u,
-  );
+test("does not write malformed schema JSON", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "codex-registry-"));
+  await assert.rejects(synchronizeSchemas({ root, fetchImpl: fetcher("not json") }), /valid JSON/u);
 });

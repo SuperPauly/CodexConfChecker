@@ -6,6 +6,19 @@ export interface SchemaDiagnosticContext {
   readonly source: string;
   readonly value: unknown;
   readonly locations: ReadonlyMap<string, SourceRange>;
+  readonly knownPropertyNames?: ReadonlySet<string>;
+}
+
+export function schemaPropertyNames(schema: unknown, names = new Set<string>()): ReadonlySet<string> {
+  if (!schema || typeof schema !== "object") return names;
+  if (Array.isArray(schema)) { for (const item of schema) schemaPropertyNames(item, names); return names; }
+  for (const [key, child] of Object.entries(schema as Record<string, unknown>)) {
+    if (key === "properties" && child && typeof child === "object" && !Array.isArray(child)) {
+      for (const propertyName of Object.keys(child as Record<string, unknown>)) names.add(propertyName);
+    }
+    schemaPropertyNames(child, names);
+  }
+  return names;
 }
 
 function escapePointer(value: string): string {
@@ -70,9 +83,10 @@ export function translateSchemaProblem(problem: SchemaProblem, context: SchemaDi
   };
   if (problem.keyword === "additionalProperties" && additional) return {
     ...base,
-    message: `Unexpected property \`${additional}\` at \`${problem.instancePath || "/"}\`.`,
-    explanation: "The schema forbids properties that are not declared for this object.",
-    suggestion: `Remove \`${additional}\` or add it to the JSON Schema if it is intentional.`,
+    kind: context.knownPropertyNames?.has(additional) ? "wrong-table" : "unknown-key",
+    message: context.knownPropertyNames?.has(additional) ? `Property \`${additional}\` is under the wrong table at \`${problem.instancePath || "/"}\`.` : `Unknown property \`${additional}\` at \`${problem.instancePath || "/"}\`.`,
+    explanation: context.knownPropertyNames?.has(additional) ? "The selected schema recognizes this key, but it is not allowed inside this object or table." : "The selected schema does not declare this key for any configuration table.",
+    suggestion: context.knownPropertyNames?.has(additional) ? `Move \`${additional}\` to the table where the selected schema declares it.` : `Remove \`${additional}\` or correct its spelling.`,
     expected: "only properties declared by the schema",
     actual: additional,
   };
@@ -84,6 +98,7 @@ export function translateSchemaProblem(problem: SchemaProblem, context: SchemaDi
     suggestion: `Replace the value with ${expected === "string" ? "quoted text" : `a valid ${expected} value`}.`,
     ...(expected ? { expected } : {}),
     actual: displayValue(actualValue),
+    kind: "wrong-type",
   };
   return {
     ...base,
